@@ -30,6 +30,7 @@ class MariSportApp {
         this.renderCatalog();
         this.renderInventory();
         this.renderCustomers();
+        console.log("Ventas antes de render stats:", this.sales);
         this.updateStats();
         this.updateTrackingSummary();
     }
@@ -482,40 +483,29 @@ setTimeout(() => {
     }
 
     async saveSale(saleData) {
-        try {
-            // First try to insert into ventas table
+    try {
+        // saleData.productos es un array de productos del carrito
+        for (const item of JSON.parse(saleData.productos)) {
             const { error } = await this.supabase
                 .from('ventas')
-                .insert([saleData]);
-
-            if (error) {
-                // If table doesn't exist, store in localStorage as backup
-                const sales = JSON.parse(localStorage.getItem('mariSportSales') || '[]');
-                sales.push({
-                    ...saleData,
-                    id: Date.now().toString(),
-                    fecha: new Date().toISOString()
-                });
-                localStorage.setItem('mariSportSales', JSON.stringify(sales));
-                this.sales = sales;
-            } else {
-                await this.loadSales();
-            }
-
-            this.updateStats();
-        } catch (error) {
-            // Fallback to localStorage
-            const sales = JSON.parse(localStorage.getItem('mariSportSales') || '[]');
-            sales.push({
-                ...saleData,
-                id: Date.now().toString(),
-                fecha: new Date().toISOString()
-            });
-            localStorage.setItem('mariSportSales', JSON.stringify(sales));
-            this.sales = sales;
-            this.updateStats();
+                .insert([{
+                    producto_id: item.id,
+                    cliente_id: null, // si no manejas cliente en el POS rápido
+                    cantidad: item.quantity,
+                    total: item.precio * item.quantity,
+                    fecha: new Date().toISOString(),
+                    pagado: true, // si el pago es inmediato
+                }]);
+            if (error) throw error;
         }
+        await this.loadSales();
+        this.updateStats();
+    } catch (error) {
+        this.showNotification('Error al guardar venta: ' + error.message, 'error');
+        console.error(error);
     }
+}
+
 
 
 
@@ -620,11 +610,12 @@ setTimeout(() => {
         const paymentMethod = document.querySelector('input[name="payment"]:checked').value;
 
         const saleData = {
-            productos: JSON.stringify(this.cart),
-            total: total,
-            forma_pago: paymentMethod,
-            fecha: new Date().toISOString().split('T')[0]
-        };
+    productos: JSON.stringify(this.cart),
+    total: total,
+    forma_pago: paymentMethod,
+    fecha: new Date().toISOString()
+};
+
 
         // Update stock for each product
         for (const item of this.cart) {
@@ -883,64 +874,84 @@ setTimeout(() => {
             `;
         }).join('');
     }
-
+    
     updateStats() {
-        const period = document.getElementById('stats-period').value;
-        const now = new Date();
-        let startDate;
+    console.log("Ventas en updateStats:", this.sales);
+    // Aquí el select debe tener valores 'day', 'month', 'year'
+    // Si el HTML los tiene como 'Hoy', 'Mes', 'Año', corrige aquí:
+    let period = document.getElementById('stats-period').value;
+    const now = new Date();
+    let startDate;
 
-        switch (period) {
-            case 'day':
-                startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                break;
-            case 'month':
-                startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-                break;
-            case 'year':
-                startDate = new Date(now.getFullYear(), 0, 1);
-                break;
-        }
+    // Normaliza el valor si el select tiene opciones en español:
+    if (period === 'Hoy') period = 'day';
+    if (period === 'Mes') period = 'month';
+    if (period === 'Año') period = 'year';
 
-        // Filter sales by period
-        const periodSales = this.sales.filter(sale => {
-            const saleDate = new Date(sale.fecha);
-            return saleDate >= startDate;
-        });
-
-        // Calculate totals
-        const totalSales = periodSales.reduce((sum, sale) => sum + sale.total, 0);
-        const totalOrders = periodSales.length;
-        const avgSale = totalOrders > 0 ? totalSales / totalOrders : 0;
-
-        // Update UI
-        document.getElementById('total-sales').textContent = `$${totalSales.toFixed(2)}`;
-        document.getElementById('total-orders').textContent = totalOrders;
-        document.getElementById('avg-sale').textContent = `$${avgSale.toFixed(2)}`;
-
-        // Calculate best sellers
-        const productSales = {};
-        periodSales.forEach(sale => {
-            const productos = JSON.parse(sale.productos || '[]');
-            productos.forEach(product => {
-                if (!productSales[product.nombre]) {
-                    productSales[product.nombre] = {
-                        name: product.nombre,
-                        quantity: 0,
-                        revenue: 0,
-                        image: product.imagen_url
-                    };
-                }
-                productSales[product.nombre].quantity += product.quantity;
-                productSales[product.nombre].revenue += product.precio * product.quantity;
-            });
-        });
-
-        const bestSellers = Object.values(productSales)
-            .sort((a, b) => b.quantity - a.quantity)
-            .slice(0, 5);
-
-        this.renderBestSellers(bestSellers);
+    switch (period) {
+        case 'day':
+            startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            break;
+        case 'month':
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            break;
+        case 'year':
+            startDate = new Date(now.getFullYear(), 0, 1);
+            break;
+        default:
+            startDate = new Date(2000, 0, 1); // valor seguro por si acaso
     }
+
+    // 1. Revisa todas las ventas cargadas
+    console.log('Todas las ventas:', this.sales);
+    const periodSales = this.sales.filter(sale => {
+        const saleDate = new Date(sale.fecha);
+        return saleDate >= startDate;
+    });
+    console.log('Ventas del período seleccionado:', periodSales);
+
+    // 2. Calcula totales
+    const totalSales = periodSales.reduce((sum, sale) => sum + sale.total, 0);
+    const totalOrders = periodSales.length;
+    const avgSale = totalOrders > 0 ? totalSales / totalOrders : 0;
+    console.log('Totales: totalSales', totalSales, 'totalOrders', totalOrders, 'avgSale', avgSale);
+
+    // 3. Actualiza el UI
+    document.getElementById('total-sales').textContent = `$${totalSales.toFixed(2)}`;
+    document.getElementById('total-orders').textContent = totalOrders;
+    document.getElementById('avg-sale').textContent = `$${avgSale.toFixed(2)}`;
+
+    // 4. Calcula productos más vendidos
+    const productSales = {};
+    periodSales.forEach(sale => {
+        console.log('Procesando venta:', sale);
+        const product = this.products.find(p => p.id === sale.producto_id);
+        if (!product) {
+            console.warn('No se encontró producto para venta:', sale);
+            return;
+        }
+        if (!productSales[product.nombre]) {
+            productSales[product.nombre] = {
+                name: product.nombre,
+                quantity: 0,
+                revenue: 0,
+                image: product.imagen_url
+            };
+        }
+        productSales[product.nombre].quantity += sale.cantidad;
+        productSales[product.nombre].revenue += sale.total;
+    });
+    console.log('Resumen productos vendidos:', productSales);
+
+    const bestSellers = Object.values(productSales)
+        .sort((a, b) => b.quantity - a.quantity)
+        .slice(0, 5);
+    console.log('Best sellers:', bestSellers);
+
+    this.renderBestSellers(bestSellers);
+}
+
+
 
     renderBestSellers(bestSellers) {
         const container = document.getElementById('best-sellers-list');
