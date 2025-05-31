@@ -1013,6 +1013,12 @@ setTimeout(() => {
         const formData = new FormData(e.target);
         const sizesChecked = Array.from(document.querySelectorAll('.size-checkboxes input:checked'))
             .map(cb => cb.value);
+        
+            const categoriaSeleccionada = document.getElementById('product-category').value;
+        if (!categoriaSeleccionada) {
+    this.showNotification('Selecciona una categoría.', 'error');
+    return;
+}
 
         const productData = {
             nombre: formData.get('product-name') || document.getElementById('product-name').value,
@@ -1023,7 +1029,7 @@ setTimeout(() => {
             color: formData.get('product-colors') || document.getElementById('product-colors').value,
             stock: parseInt(formData.get('product-stock') || document.getElementById('product-stock').value)
         };
-
+        console.log("Producto a guardar:", productData);
         await this.saveProduct(productData);
         this.closeProductModal();
     }
