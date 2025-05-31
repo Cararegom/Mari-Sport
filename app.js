@@ -20,6 +20,7 @@ class MariSportApp {
 
     async init() {
         this.setupEventListeners();
+        await this.loadCategories(); 
         await this.loadProducts();
         await this.loadCustomers();
         await this.loadCreditSales();
@@ -49,6 +50,20 @@ class MariSportApp {
                 this.switchCreditSection(section);
             });
         });
+
+// categorias    
+        document.getElementById('manage-categories-btn').onclick = () => {
+    document.getElementById('category-modal').style.display = 'block';
+    this.loadCategories();
+};
+document.getElementById('close-category-modal').onclick =
+document.getElementById('cancel-category').onclick = () => {
+    document.getElementById('category-modal').style.display = 'none';
+    document.getElementById('category-form').reset();
+    document.getElementById('category-id').value = '';
+};
+document.getElementById('category-form').onsubmit = (e) => this.createOrUpdateCategory(e);
+
 
         // POS Events
         document.getElementById('complete-sale').addEventListener('click', () => this.completeSale());
@@ -169,6 +184,91 @@ class MariSportApp {
             this.showNotification('Error al guardar producto', 'error');
         }
     }
+    // ==== CATEGORÍAS ====
+populateCategorySelect() {
+    // Este método llena el select de categorías con lo que hay en Supabase
+    const select = document.getElementById('product-category');
+    if (!select) return;
+    select.innerHTML = '<option value="">Seleccionar...</option>';
+    if (this.categories && this.categories.length) {
+        this.categories.forEach(cat => {
+            const opt = document.createElement('option');
+            opt.value = cat.nombre;
+            opt.textContent = cat.nombre;
+            select.appendChild(opt);
+        });
+    }
+}
+
+// Variable para almacenar las categorías cargadas
+categories = [];
+
+// Cargar categorías desde Supabase
+async loadCategories() {
+    const { data, error } = await this.supabase
+        .from('categorias')
+        .select('*')
+        .order('nombre', { ascending: true });
+    if (!error) this.categories = data || [];
+    else this.categories = [];
+    this.renderCategoriesList();
+}
+
+// Renderizar la lista en el modal
+renderCategoriesList() {
+    const list = document.getElementById('categories-list');
+    if (!list) return;
+    list.innerHTML = '';
+    this.categories.forEach(cat => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <span>${cat.nombre}</span>
+          <button class="edit-btn" data-id="${cat.id}" style="margin-left:10px;">Editar</button>
+          <button class="delete-btn" data-id="${cat.id}" style="margin-left:5px;">Eliminar</button>
+        `;
+        list.appendChild(li);
+    });
+    // Listeners
+    list.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.onclick = () => this.editCategory(btn.dataset.id);
+    });
+    list.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.onclick = () => this.deleteCategory(btn.dataset.id);
+    });
+}
+
+// Crear o actualizar categoría
+async createOrUpdateCategory(e) {
+    e.preventDefault();
+    const id = document.getElementById('category-id').value;
+    const nombre = document.getElementById('category-name').value.trim();
+    if (!nombre) return;
+    if (id) {
+        // Update
+        await this.supabase.from('categorias').update({ nombre }).eq('id', id);
+    } else {
+        // Create
+        await this.supabase.from('categorias').insert({ nombre });
+    }
+    document.getElementById('category-form').reset();
+    document.getElementById('category-id').value = '';
+    this.loadCategories();
+}
+
+// Editar categoría (pone los valores en el form)
+editCategory(id) {
+    const cat = this.categories.find(c => c.id === id);
+    if (!cat) return;
+    document.getElementById('category-id').value = cat.id;
+    document.getElementById('category-name').value = cat.nombre;
+}
+
+// Eliminar categoría
+async deleteCategory(id) {
+    if (!confirm('¿Eliminar esta categoría?')) return;
+    await this.supabase.from('categorias').delete().eq('id', id);
+    this.loadCategories();
+}
 
     async deleteProduct(id) {
     const confirmed = await this.showConfirmation('¿Estás segura de que deseas eliminar este producto?');
@@ -416,6 +516,8 @@ setTimeout(() => {
             this.updateStats();
         }
     }
+
+
 
     // Image Upload
     async handleImageUpload(event) {
@@ -871,6 +973,7 @@ setTimeout(() => {
 
     // Modal Methods
     openProductModal(productId = null) {
+        this.populateCategorySelect();
         this.currentEditingProduct = productId;
         const modal = document.getElementById('product-modal');
         const form = document.getElementById('product-form');
