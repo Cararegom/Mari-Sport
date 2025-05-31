@@ -1,0 +1,104 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --primary-gradient: linear-gradient(135deg, #ff6b6b, #ee5a24);
+    --secondary-gradient: linear-gradient(135deg, #667eea, #764ba2);
+    --success-gradient: linear-gradient(135deg, #28a745, #20c997);
+    --background-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    
+    --color-primary: #ff6b6b;
+    --color-secondary: #667eea;
+    --color-success: #28a745;
+    --color-warning: #ffc107;
+    --color-danger: #dc3545;
+    --color-info: #17a2b8;
+    
+    --color-text: #333;
+    --color-text-muted: #6c757d;
+    --color-text-light: #495057;
+    
+    --color-bg-light: #f8f9fa;
+    --color-bg-white: white;
+    --color-border: #e9ecef;
+    
+    --border-radius: 8px;
+    --border-radius-lg: 15px;
+    --border-radius-pill: 25px;
+    
+    --shadow-sm: 0 5px 15px rgba(0,0,0,0.1);
+    --shadow-lg: 0 0 20px rgba(0,0,0,0.1);
+    
+    --transition: all 0.3s ease;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: var(--background-gradient);
+    min-height: 100vh;
+    color: var(--color-text);
+}
+
+.app-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: var(--color-bg-white);
+    min-height: 100vh;
+    box-shadow: var(--shadow-lg);
+}
+
+/* Header */
+.header {
+    background: var(--primary-gradient);
+    color: white;
+    padding: 1rem;
+    text-align: center;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-size: 1.8rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.motivational-text {
+    font-size: 0.9rem;
+    opacity: 0.9;
+    font-style: italic;
+}
+
+/* Main Content */
+.main-content {
+    padding: 1rem;
+    min-height: calc(100vh - 140px);
+}
+
+.section {
+    display: none;
+}
+
+.section.active {
+    display: block;
+}
+
+.section-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.section-header h2 {
+    color: var(--color-text-light);
+    margin-bottom: 0.5rem;
+}
+
+.motivational {
+    color: var(--color-text-muted);
+    font-style: italic;
+}
