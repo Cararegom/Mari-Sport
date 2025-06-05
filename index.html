@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -16,7 +18,6 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- Header -->
         <header class="header">
             <div class="logo">
                 <i class="fas fa-dumbbell"></i>
@@ -25,7 +26,6 @@
             <div class="motivational-text">¡Activa tu energía!</div>
         </header>
 
-        <!-- Navigation -->
         <nav class="nav-tabs">
             <button class="nav-tab active" data-section="pos">
                 <i class="fas fa-cash-register"></i>
@@ -49,9 +49,7 @@
             </button>
         </nav>
 
-        <!-- Main Content -->
         <main class="main-content">
-            <!-- POS Section -->
             <section id="pos" class="section active">
                 <div class="section-header">
                     <h2><i class="fas fa-cash-register"></i> Punto de Venta</h2>
@@ -69,7 +67,7 @@
                         <div class="cart-items" id="cart-items"></div>
                         <div class="cart-total">
                             <div class="total-line">
-                                <span>Total: $<span id="cart-total">0</span></span>
+                                <span>Total: $<span id="cart-total">0.00</span></span>
                             </div>
                         </div>
                         
@@ -78,7 +76,7 @@
                             <div class="payment-methods">
                                 <label class="payment-option">
                                     <input type="radio" name="payment" value="efectivo" checked>
-                                    <span><i class="fas fa-money-bill"></i> Efectivo</span>
+                                    <span><i class="fas fa-money-bill-wave"></i> Efectivo</span>
                                 </label>
                                 <label class="payment-option">
                                     <input type="radio" name="payment" value="tarjeta">
@@ -86,19 +84,18 @@
                                 </label>
                                 <label class="payment-option">
                                     <input type="radio" name="payment" value="transferencia">
-                                    <span><i class="fas fa-mobile-alt"></i> Transferencia</span>
+                                    <span><i class="fas fa-exchange-alt"></i> Transferencia</span>
                                 </label>
                             </div>
                             
                             <button class="btn-primary" id="complete-sale" disabled>
-                                <i class="fas fa-check"></i> Completar Venta
+                                <i class="fas fa-check-circle"></i> Completar Venta
                             </button>
                         </div>
                     </div>
                 </div>
             </section>
 
-            <!-- Catalog Section -->
             <section id="catalog" class="section">
                 <div class="section-header">
                     <h2><i class="fas fa-th-large"></i> Catálogo</h2>
@@ -108,8 +105,7 @@
                 <div class="filter-bar">
                     <select id="category-filter">
                         <option value="">Todas las categorías</option>
-                        <!-- Categorías dinámicas -->
-                    </select>
+                        </select>
                     
                     <select id="size-filter">
                         <option value="">Todas las tallas</option>
@@ -121,10 +117,15 @@
                     </select>
                 </div>
                 
+                <div class="catalog-actions" style="margin-bottom: 1rem; text-align: right;">
+                    <button class="btn-info" id="download-catalog-pdf-btn">
+                        <i class="fas fa-file-pdf"></i> Descargar Catálogo (PDF)
+                    </button>
+                </div>
+
                 <div class="catalog-grid" id="catalog-grid"></div>
             </section>
 
-            <!-- Inventory Section -->
             <section id="inventory" class="section">
                 <div class="section-header">
                     <h2><i class="fas fa-boxes"></i> Inventario</h2>
@@ -134,6 +135,12 @@
                 <div class="inventory-actions">
                     <button class="btn-secondary" id="add-product-btn">
                         <i class="fas fa-plus"></i> Agregar Producto
+                    </button>
+                    <button class="btn-success" id="register-purchase-btn" style="margin-left: 1rem;">
+                        <i class="fas fa-shopping-basket"></i> Registrar Compra
+                    </button>
+                    <button class="btn-warning" id="manage-receptions-btn" style="margin-left: 1rem;">
+                        <i class="fas fa-truck-loading"></i> Gestionar Recepciones
                     </button>
                     <button class="btn-primary" id="manage-categories-btn" style="margin-left: 1rem;">
                         <i class="fas fa-tags"></i> Gestionar Categorías
@@ -147,7 +154,7 @@
                                 <th>Imagen</th>
                                 <th>Nombre</th>
                                 <th>Categoría</th>
-                                <th>Precio</th>
+                                <th>Precio Venta</th>
                                 <th>Stock</th>
                                 <th>Acciones</th>
                             </tr>
@@ -157,7 +164,6 @@
                 </div>
             </section>
 
-            <!-- Statistics Section -->
             <section id="stats" class="section">
                 <div class="section-header">
                     <h2><i class="fas fa-chart-bar"></i> Estadísticas</h2>
@@ -174,12 +180,30 @@
                 
                 <div class="stats-grid">
                     <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-dollar-sign"></i>
+                        <div class="stat-icon income-icon"> <i class="fas fa-arrow-circle-up"></i>
                         </div>
                         <div class="stat-info">
-                            <div class="stat-value" id="total-sales">$0</div>
-                            <div class="stat-label">Total Vendido</div>
+                            <div class="stat-value" id="total-sales">$0.00</div> <div class="stat-label">Total Ingresos</div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon expense-icon">
+                            <i class="fas fa-arrow-circle-down"></i>
+                        </div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="total-expenses">$0.00</div>
+                            <div class="stat-label">Total Egresos</div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon balance-icon">
+                            <i class="fas fa-balance-scale"></i>
+                        </div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="general-balance">$0.00</div>
+                            <div class="stat-label">Balance General</div>
                         </div>
                     </div>
                     
@@ -189,7 +213,7 @@
                         </div>
                         <div class="stat-info">
                             <div class="stat-value" id="total-orders">0</div>
-                            <div class="stat-label">Órdenes</div>
+                            <div class="stat-label">Órdenes (POS)</div>
                         </div>
                     </div>
                     
@@ -198,19 +222,18 @@
                             <i class="fas fa-star"></i>
                         </div>
                         <div class="stat-info">
-                            <div class="stat-value" id="avg-sale">$0</div>
-                            <div class="stat-label">Venta Promedio</div>
+                            <div class="stat-value" id="avg-sale">$0.00</div>
+                            <div class="stat-label">Venta Promedio (POS)</div>
                         </div>
                     </div>
                 </div>
                 
                 <div class="best-sellers">
-                    <h3>Productos Más Vendidos</h3>
+                    <h3>Productos Más Vendidos (POS)</h3>
                     <div class="best-sellers-list" id="best-sellers-list"></div>
                 </div>
             </section>
 
-            <!-- Credit Section -->
             <section id="credit" class="section">
                 <div class="section-header">
                     <h2><i class="fas fa-credit-card"></i> Ventas a Crédito</h2>
@@ -228,11 +251,9 @@
                         <i class="fas fa-hand-holding-usd"></i> Pagos
                     </button>
                     <button class="credit-tab" data-credit-section="tracking">
-                        <i class="fas fa-exclamation-triangle"></i> Seguimiento
-                    </button>
+                        <i class="fas fa-chart-line"></i> Seguimiento </button>
                 </div>
 
-                <!-- Customers Subsection -->
                 <div id="customers" class="credit-subsection active">
                     <div class="subsection-header">
                         <h3>Gestión de Clientes</h3>
@@ -248,28 +269,25 @@
                     <div class="customers-grid" id="customers-grid"></div>
                 </div>
 
-                <!-- Credit Sales Subsection -->
                 <div id="credit-sales" class="credit-subsection">
                     <div class="subsection-header">
                         <h3>Ventas a Crédito</h3>
                         <button class="btn-primary" id="new-credit-sale-btn">
-                            <i class="fas fa-plus"></i> Nueva Venta Fiada
+                            <i class="fas fa-plus-circle"></i> Nueva Venta Fiada
                         </button>
                     </div>
                     
                     <div class="credit-sales-list" id="credit-sales-list"></div>
                 </div>
 
-                <!-- Payments Subsection -->
                 <div id="payments" class="credit-subsection">
                     <div class="subsection-header">
-                        <h3>Registro de Pagos</h3>
+                        <h3>Registro de Pagos y Deudas Pendientes</h3>
                     </div>
                     
                     <div class="pending-debts" id="pending-debts"></div>
                 </div>
 
-                <!-- Tracking Subsection -->
                 <div id="tracking" class="credit-subsection">
                     <div class="subsection-header">
                         <h3>Seguimiento de Deudas</h3>
@@ -282,27 +300,25 @@
                                     <i class="fas fa-file-invoice-dollar"></i>
                                 </div>
                                 <div class="summary-info">
-                                    <div class="summary-value" id="total-credit">$0</div>
+                                    <div class="summary-value" id="total-credit">$0.00</div>
                                     <div class="summary-label">Total Fiado</div>
                                 </div>
                             </div>
                             
                             <div class="summary-card">
                                 <div class="summary-icon">
-                                    <i class="fas fa-money-bill-wave"></i>
-                                </div>
+                                    <i class="fas fa-money-check-alt"></i> </div>
                                 <div class="summary-info">
-                                    <div class="summary-value" id="total-collected">$0</div>
+                                    <div class="summary-value" id="total-collected">$0.00</div>
                                     <div class="summary-label">Total Cobrado</div>
                                 </div>
                             </div>
                             
                             <div class="summary-card">
                                 <div class="summary-icon">
-                                    <i class="fas fa-clock"></i>
-                                </div>
+                                    <i class="fas fa-hourglass-half"></i> </div>
                                 <div class="summary-info">
-                                    <div class="summary-value" id="total-pending">$0</div>
+                                    <div class="summary-value" id="total-pending">$0.00</div>
                                     <div class="summary-label">Total Pendiente</div>
                                 </div>
                             </div>
@@ -314,32 +330,30 @@
             </section>
         </main>
 
-        <!-- Modals -->
         <div id="product-modal" class="modal">
             <div class="modal-content">
                 <span class="close">&times;</span>
                 <h3 id="modal-title">Agregar Producto</h3>
                 <form id="product-form">
                     <div class="form-group">
-                        <label>Nombre del producto</label>
+                        <label for="product-name">Nombre del producto</label>
                         <input type="text" id="product-name" required>
                     </div>
                     
                     <div class="form-group">
-                        <label>Categoría</label>
+                        <label for="product-category">Categoría</label>
                         <select id="product-category" required>
                             <option value="">Seleccionar...</option>
-                            <!-- Opciones dinámicas con JS -->
-                        </select>
+                            </select>
                     </div>
                     
                     <div class="form-group">
-                        <label>Precio</label>
-                        <input type="number" id="product-price" step="0.01" required>
+                        <label for="product-price">Precio de Venta</label>
+                        <input type="number" id="product-price" step="0.01" min="0" required>
                     </div>
                     
                     <div class="form-group">
-                        <label>Imagen del producto</label>
+                        <label for="product-image-file">Imagen del producto</label>
                         <input type="file" id="product-image-file" accept="image/*">
                         <input type="url" id="product-image" placeholder="O ingresa URL de imagen" style="margin-top: 0.5rem;">
                         <div id="image-preview" style="margin-top: 0.5rem;"></div>
@@ -350,20 +364,14 @@
                         <div class="size-checkboxes">
                             <label><input type="checkbox" value="XS"> XS</label>
                             <label><input type="checkbox" value="S"> S</label>
-                            <label><input type="checkbox" value="M"> M</label>
-                            <label><input type="checkbox" value="L"> L</label>
+                            <label><input type="checkbox" value="M" checked> M</label> <label><input type="checkbox" value="L"> L</label>
                             <label><input type="checkbox" value="XL"> XL</label>
                         </div>
                     </div>
                     
                     <div class="form-group">
-                        <label>Colores disponibles</label>
+                        <label for="product-colors">Colores disponibles (separados por coma)</label>
                         <input type="text" id="product-colors" placeholder="Ej: Negro, Rosa, Azul">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Stock inicial</label>
-                        <input type="number" id="product-stock" min="0" required>
                     </div>
                     
                     <div class="form-actions">
@@ -374,153 +382,248 @@
             </div>
         </div>
 
-        <!-- Customer Modal -->
         <div id="customer-modal" class="modal">
             <div class="modal-content">
                 <span class="close" id="close-customer-modal">&times;</span>
                 <h3 id="customer-modal-title">Agregar Cliente</h3>
                 <form id="customer-form">
                     <div class="form-group">
-                        <label>Nombre Completo</label>
+                        <label for="customer-name">Nombre Completo</label>
                         <input type="text" id="customer-name" required>
                     </div>
                     
                     <div class="form-group">
-                        <label>Teléfono</label>
+                        <label for="customer-phone">Teléfono</label>
                         <input type="tel" id="customer-phone" required>
                     </div>
                     
                     <div class="form-group">
-                        <label>Dirección</label>
+                        <label for="customer-address">Dirección (opcional)</label>
                         <textarea id="customer-address" rows="3"></textarea>
                     </div>
                     
                     <div class="form-actions">
                         <button type="button" class="btn-secondary" id="cancel-customer">Cancelar</button>
-                        <button type="submit" class="btn-primary">Guardar</button>
+                        <button type="submit" class="btn-primary">Guardar Cliente</button>
                     </div>
                 </form>
             </div>
         </div>
 
-        <!-- Credit Sale Modal -->
-        <div id="credit-sale-modal" class="modal">
-            <div class="modal-content">
+        <div id="credit-sale-modal" class="modal"> <div class="modal-content large">
                 <span class="close" id="close-credit-sale-modal">&times;</span>
                 <h3>Nueva Venta a Crédito</h3>
                 <form id="credit-sale-form">
                     <div class="form-group">
-                        <label>Cliente</label>
+                        <label for="credit-customer">Cliente</label>
                         <select id="credit-customer" required>
                             <option value="">Seleccionar cliente...</option>
                         </select>
                     </div>
                     
                     <div class="form-group">
-                        <label>Productos</label>
-                        <div class="credit-products-selector" id="credit-products-selector"></div>
-                        <div class="selected-credit-products" id="selected-credit-products"></div>
+                        <label>Productos (selecciona para añadir)</label>
+                        <div class="credit-products-selector" id="credit-products-selector">
+                            </div>
+                        <label style="margin-top: 1rem;">Productos Seleccionados:</label>
+                        <div class="selected-credit-products" id="selected-credit-products">
+                            <p class="empty-message">No hay productos seleccionados.</p>
+                        </div>
                     </div>
                     
                     <div class="form-group">
-                        <label>Total de la Venta</label>
-                        <input type="number" id="credit-total" step="0.01" readonly>
+                        <label for="credit-total">Total de la Venta</label>
+                        <input type="number" id="credit-total" step="0.01" readonly required>
                     </div>
                     
                     <div class="form-group">
-                        <label>Abono Inicial (opcional)</label>
+                        <label for="initial-payment">Abono Inicial (opcional)</label>
                         <input type="number" id="initial-payment" step="0.01" min="0">
                     </div>
                     
                     <div class="form-group">
-                        <label>Fecha del Primer Pago</label>
+                        <label for="first-payment-date">Fecha Límite del Crédito</label>
                         <input type="date" id="first-payment-date" required>
                     </div>
                     
                     <div class="form-group">
-                        <label>Plazo</label>
+                        <label for="payment-term-value">Plazo (en el tipo seleccionado)</label>
                         <div class="payment-terms">
                             <select id="payment-term-type">
                                 <option value="days">Días</option>
-                                <option value="installments">Cuotas</option>
+                                <option value="installments" selected>Meses (cuotas)</option>
                             </select>
-                            <input type="number" id="payment-term-value" min="1" required>
+                            <input type="number" id="payment-term-value" min="1" value="1" required>
                         </div>
                     </div>
                     
                     <div class="form-actions">
                         <button type="button" class="btn-secondary" id="cancel-credit-sale">Cancelar</button>
-                        <button type="submit" class="btn-primary">Registrar Venta</button>
+                        <button type="submit" class="btn-primary">Registrar Venta a Crédito</button>
                     </div>
                 </form>
             </div>
         </div>
 
-        <!-- Payment Modal -->
         <div id="payment-modal" class="modal">
             <div class="modal-content">
                 <span class="close" id="close-payment-modal">&times;</span>
-                <h3>Registrar Pago</h3>
+                <h3>Registrar Abono a Crédito</h3>
                 <form id="payment-form">
-                    <div class="debt-info" id="debt-info"></div>
+                    <div class="debt-info" id="debt-info">
+                        </div>
                     
                     <div class="form-group">
-                        <label>Monto del Abono</label>
+                        <label for="payment-amount">Monto del Abono</label>
                         <input type="number" id="payment-amount" step="0.01" min="0.01" required>
                     </div>
                     
                     <div class="form-group">
-                        <label>Fecha del Pago</label>
+                        <label for="payment-date">Fecha del Abono</label>
                         <input type="date" id="payment-date" required>
                     </div>
                     
                     <div class="form-group">
-                        <label>Notas (opcional)</label>
+                        <label for="payment-notes">Notas (opcional)</label>
                         <textarea id="payment-notes" rows="2"></textarea>
                     </div>
                     
                     <div class="form-actions">
                         <button type="button" class="btn-secondary" id="cancel-payment">Cancelar</button>
-                        <button type="submit" class="btn-primary">Registrar Pago</button>
+                        <button type="submit" class="btn-primary">Registrar Abono</button>
                     </div>
                 </form>
             </div>
         </div>
 
-        <!-- Category Modal -->
         <div id="category-modal" class="modal">
-            <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-content" style="max-width: 500px;">
                 <span class="close" id="close-category-modal">&times;</span>
-                <h3>Categorías</h3>
+                <h3>Gestionar Categorías</h3>
                 <form id="category-form">
                     <input type="hidden" id="category-id">
                     <div class="form-group">
                         <label for="category-name">Nombre de la Categoría</label>
-                        <input type="text" id="category-name" required>
+                        <input type="text" id="category-name" required placeholder="Ej: Camisetas, Zapatillas">
                     </div>
                     <div class="form-actions">
                         <button type="button" class="btn-secondary" id="cancel-category">Cancelar</button>
-                        <button type="submit" class="btn-primary">Guardar</button>
+                        <button type="submit" class="btn-primary">Guardar Categoría</button>
                     </div>
                 </form>
-                <div style="margin-top:2rem;">
-                    <h4>Categorías existentes</h4>
-                    <ul id="categories-list"></ul>
+                <div class="existing-categories" style="margin-top:2rem;">
+                    <h4>Categorías Existentes</h4>
+                    <ul id="categories-list" class="styled-list">
+                        </ul>
                 </div>
             </div>
         </div>
 
-        <!-- Custom Notification System -->
-        <div id="notification-overlay" class="notification-overlay">
-            <div class="notification-container">
-                <div class="notification-icon" id="notification-icon"></div>
-                <div class="notification-message" id="notification-message"></div>
-                <div class="notification-buttons" id="notification-buttons"></div>
+        <div id="purchase-modal" class="modal">
+            <div class="modal-content">
+                <span class="close" id="close-purchase-modal">&times;</span>
+                <h3>Registrar Compra de Mercancía</h3>
+                <form id="purchase-form">
+                    <div class="form-group">
+                        <label for="purchase-product">Producto Comprado</label>
+                        <select id="purchase-product" required>
+                            <option value="">Seleccionar producto...</option>
+                            </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="purchase-quantity">Cantidad Comprada</label>
+                        <input type="number" id="purchase-quantity" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="purchase-cost-price">Precio de Compra Unitario</label>
+                        <input type="number" id="purchase-cost-price" step="0.01" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="purchase-date">Fecha de Compra</label>
+                        <input type="date" id="purchase-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="purchase-supplier">Proveedor (opcional)</label>
+                        <input type="text" id="purchase-supplier" placeholder="Nombre del proveedor">
+                    </div>
+                    <div class="form-group">
+                        <label for="purchase-notes">Notas de Compra (opcional)</label>
+                        <textarea id="purchase-notes" rows="2"></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" id="cancel-purchase">Cancelar</button>
+                        <button type="submit" class="btn-primary">Registrar Compra</button>
+                    </div>
+                </form>
             </div>
         </div>
 
-    </div>
+        <div id="reception-management-modal" class="modal">
+            <div class="modal-content large">
+                <span class="close" id="close-reception-management-modal">&times;</span>
+                <h3>Gestionar Recepciones de Compras</h3>
+                <div class="filter-bar" style="margin-bottom: 1rem;">
+                    <label for="reception-status-filter">Filtrar por estado:</label>
+                    <select id="reception-status-filter">
+                        <option value="pendiente">Pendiente</option>
+                        <option value="recibida_parcial">Recibida Parcial</option>
+                        <option value="recibida_total">Recibida Total</option>
+                        <option value="">Todas</option>
+                    </select>
+                </div>
+                <div id="pending-receptions-list" class="table-container" style="max-height: 60vh; overflow-y: auto;">
+                    </div>
+            </div>
+        </div>
 
-    <script src="app.js"></script>
+        <div id="receive-purchase-modal" class="modal">
+            <div class="modal-content">
+                <span class="close" id="close-receive-purchase-modal">&times;</span>
+                <h3>Registrar Recepción de Mercancía</h3>
+                <form id="receive-purchase-form">
+                    <input type="hidden" id="receive-purchase-id">
+                    <div id="receive-product-info" class="form-group" style="padding: 10px; background-color: #f0f0f0; border-radius: 4px; margin-bottom:1rem;">
+                        </div>
+                    <div class="form-group">
+                        <label>Cantidad Comprada Total:</label>
+                        <input type="text" id="receive-quantity-ordered" readonly class="readonly-input">
+                    </div>
+                    <div class="form-group">
+                        <label>Cantidad Ya Recibida Anteriormente:</label>
+                        <input type="text" id="receive-quantity-already-received" readonly class="readonly-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="receive-quantity-now">Cantidad a Recibir Ahora:</label>
+                        <input type="number" id="receive-quantity-now" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="receive-date">Fecha de Recepción:</label>
+                        <input type="date" id="receive-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="receive-notes">Notas de Recepción (opcional):</label>
+                        <textarea id="receive-notes" rows="2"></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" id="cancel-receive-purchase">Cancelar</button>
+                        <button type="submit" class="btn-primary">Confirmar Recepción</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+
+        <div id="notification-overlay" class="notification-overlay">
+            <div class="notification-container">
+                <div class="notification-icon" id="notification-icon">
+                    </div>
+                <div class="notification-message" id="notification-message">
+                    </div>
+                <div class="notification-buttons" id="notification-buttons">
+                    </div>
+            </div>
+        </div>
+
+    </div> <script src="app.js"></script>
 </body>
 </html>

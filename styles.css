@@ -1266,3 +1266,24 @@ body {
     margin: 0 auto 0.5rem auto;
     display: block;
 }
+.inventory-tabs {
+  display: flex;
+  margin-bottom: 1.2rem;
+}
+.inventory-tab {
+  background: #f8f9fa;
+  color: #495057;
+  padding: 0.7rem 1.5rem;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-weight: bold;
+  margin-right: 0.5rem;
+  border-radius: 10px 10px 0 0;
+  transition: 0.2s;
+}
+.inventory-tab.active {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #fff;
+  border-bottom: 2px solid #667eea;
+}
