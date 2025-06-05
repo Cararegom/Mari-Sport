@@ -96,7 +96,6 @@ class MariSportApp {
             });
         }
 
-
         // Modal de Pagos (Abonos)
         document.getElementById('payment-form').addEventListener('submit', (e) => this.handlePaymentSubmit(e));
         document.getElementById('cancel-payment').addEventListener('click', () => this.closePaymentModal());
@@ -119,6 +118,8 @@ class MariSportApp {
         if (closeReceptionManagementModalBtn) closeReceptionManagementModalBtn.addEventListener('click', () => this.closeReceptionManagementModal());
         const receptionStatusFilter = document.getElementById('reception-status-filter');
         if (receptionStatusFilter) receptionStatusFilter.addEventListener('change', () => this.renderPendingReceptionsList());
+
+        
 
         // Modal de Registrar Recepción
         const receivePurchaseForm = document.getElementById('receive-purchase-form');
@@ -143,12 +144,20 @@ class MariSportApp {
         if (viewAllPurchasesBtn) viewAllPurchasesBtn.addEventListener('click', () => this.toggleAllPurchasesView());
 
 
+
         // Cierre de modales al hacer clic fuera
         window.addEventListener('click', (e) => {
             if (e.target.classList.contains('modal')) {
                 e.target.style.display = 'none';
             }
         });
+    }
+    
+     generarEstadoCuentaCliente(clienteId) {
+        const cliente = this.customers.find(c => c.id === clienteId);
+        const ventasCliente = this.creditSales.filter(s => s.cliente_id === clienteId);
+        const abonosCliente = this.payments.filter(a => ventasCliente.some(v => v.id === a.venta_id));
+        generarPDFEstadoCuenta({ cliente, ventasCliente, abonosCliente });
     }
 
     // --- Métodos de Navegación ---
@@ -711,6 +720,17 @@ class MariSportApp {
                     .insert([financialMovementData]);
                 if (movementError) console.warn("Error registrando abono inicial como ingreso:", movementError.message);
             }
+            const productosFiados = JSON.parse(saleData.productos);
+const cliente = this.customers.find(c => c.id === saleData.cliente_id);
+generarPDFVenta({
+    productos: productosFiados,
+    cliente,
+    total: saleData.total,
+    fecha: new Date().toLocaleString(),
+    tipo: 'credito',
+    abono_inicial: saleData.abono_inicial,
+    saldo_pendiente: saleData.saldo_pendiente
+});
 
             await this.loadProducts(); 
             await this.loadCreditSales();
@@ -741,52 +761,73 @@ class MariSportApp {
     }
 
     async savePayment(paymentData) { 
-        try {
-            const { data: savedAbono, error: abonoError } = await this.supabase
-                .from('abonos')
-                .insert([paymentData])
-                .select()
-                .single();
-            if (abonoError) throw abonoError;
+    try {
+        const { data: savedAbono, error: abonoError } = await this.supabase
+            .from('abonos')
+            .insert([paymentData])
+            .select()
+            .single();
+        if (abonoError) throw abonoError;
 
-            const sale = this.creditSales.find(s => s.id === paymentData.venta_id);
-            if (sale) {
-                const newBalance = sale.saldo_pendiente - paymentData.monto;
-                const status = newBalance <= 0 ? 'pagada' : 'pendiente';
-                await this.supabase.from('ventas_fiadas')
-                    .update({ saldo_pendiente: Math.max(0, newBalance), estado: status })
-                    .eq('id', paymentData.venta_id);
-            }
-
-            const financialMovementData = {
-                tipo: 'ingreso',
-                descripcion: `Abono a venta crédito ID: ${paymentData.venta_id}`,
-                monto: paymentData.monto,
-                fecha: new Date(paymentData.fecha_abono).toISOString(),
-                referencia_id: savedAbono.id,
-                tabla_referencia: 'abonos'
-            };
-            const { error: movementError } = await this.supabase
-                .from('movimientos_financieros')
-                .insert([financialMovementData]);
-            if (movementError) {
-                console.error("Error registrando ingreso por abono:", movementError);
-                this.showNotification('Abono guardado, pero error registrando ingreso financiero.', 'warning');
-            }
-
-            await this.loadCreditSales();
-            await this.loadPayments();
-            await this.loadFinancialMovements();
-            this.renderPendingDebts();
-            this.updateTrackingSummary();
-            this.renderActiveDebts();
-            this.updateStats(); 
-            this.showNotification('Abono registrado exitosamente.', 'success');
-        } catch (error) {
-            console.error("Error en savePayment:", error);
-            this.showNotification('Error al registrar abono: ' + error.message, 'error');
+        const sale = this.creditSales.find(s => s.id === paymentData.venta_id);
+        if (sale) {
+            const newBalance = sale.saldo_pendiente - paymentData.monto;
+            const status = newBalance <= 0 ? 'pagada' : 'pendiente';
+            await this.supabase.from('ventas_fiadas')
+                .update({ saldo_pendiente: Math.max(0, newBalance), estado: status })
+                .eq('id', paymentData.venta_id);
         }
+
+        const financialMovementData = {
+            tipo: 'ingreso',
+            descripcion: `Abono a venta crédito ID: ${paymentData.venta_id}`,
+            monto: paymentData.monto,
+            fecha: new Date(paymentData.fecha_abono).toISOString(),
+            referencia_id: savedAbono.id,
+            tabla_referencia: 'abonos'
+        };
+        const { error: movementError } = await this.supabase
+            .from('movimientos_financieros')
+            .insert([financialMovementData]);
+        if (movementError) {
+            console.error("Error registrando ingreso por abono:", movementError);
+            this.showNotification('Abono guardado, pero error registrando ingreso financiero.', 'warning');
+        }
+
+        // Recarga datos antes de generar el PDF para tener abonos y saldo actualizado
+        await this.loadCreditSales();
+        await this.loadPayments();
+        await this.loadFinancialMovements();
+
+        // Genera el PDF del abono
+        if (sale) {
+            const cliente = sale.clientes;
+            const abonos = this.payments.filter(p => p.venta_id === sale.id);
+            // Incluye el nuevo abono recién agregado:
+            abonos.unshift({
+                ...paymentData,
+                fecha_abono: paymentData.fecha_abono,
+                monto: paymentData.monto,
+            });
+            generarPDFAbono({
+                cliente,
+                sale: { ...sale, saldo_pendiente: Math.max(0, sale.saldo_pendiente - paymentData.monto) },
+                abono: paymentData,
+                abonos
+            });
+        }
+
+        this.renderPendingDebts();
+        this.updateTrackingSummary();
+        this.renderActiveDebts();
+        this.updateStats(); 
+        this.showNotification('Abono registrado exitosamente.', 'success');
+    } catch (error) {
+        console.error("Error en savePayment:", error);
+        this.showNotification('Error al registrar abono: ' + error.message, 'error');
     }
+}
+
     
     // --- POS ---
     async completeSale() {
@@ -819,7 +860,13 @@ class MariSportApp {
             const newStock = productInDb.stock - item.quantity;
             await this.updateProductStock(item.id, newStock, false); 
         }
-        
+        generarPDFVenta({
+    productos: this.cart,
+    cliente: null, // Si quieres pedir el cliente, pásalo aquí
+    total: this.cart.reduce((sum, item) => sum + item.precio * item.quantity, 0),
+    fecha: new Date().toLocaleString(),
+    tipo: 'contado'
+});
         await this.saveSale(saleData); 
         
         await this.loadProducts(); 
@@ -1571,24 +1618,28 @@ class MariSportApp {
              return;
         }
         container.innerHTML = customersToRender.map(customer => {
-            const customerDebts = this.creditSales.filter(sale => sale.cliente_id === customer.id && sale.estado !== 'pagada');
-            const totalDebt = customerDebts.reduce((sum, sale) => sum + (sale.saldo_pendiente || 0), 0);
-            return `
-                <div class="customer-card">
-                    <div class="customer-info">
-                        <strong class="customer-name">${customer.nombre}</strong>
-                        <span class="customer-phone">${customer.telefono}</span>
-                        <span class="customer-address">${customer.direccion || 'Sin dirección'}</span>
-                    </div>
-                    <div class="customer-debt ${totalDebt > 0 ? 'has-debt' : ''}">
-                        ${totalDebt > 0 ? `Debe: $${totalDebt.toFixed(2)}` : 'Sin deudas'}
-                    </div>
-                    <div class="customer-actions">
-                        <button class="btn-secondary small-btn" onclick="app.editCustomer('${customer.id}')"><i class="fas fa-edit"></i></button>
-                        <button class="btn-danger small-btn" onclick="app.deleteCustomer('${customer.id}')"><i class="fas fa-trash"></i></button>
-                    </div>
-                </div>`;
-        }).join('');
+    const customerDebts = this.creditSales.filter(sale => sale.cliente_id === customer.id && sale.estado !== 'pagada');
+    const totalDebt = customerDebts.reduce((sum, sale) => sum + (sale.saldo_pendiente || 0), 0);
+    return `
+        <div class="customer-card">
+            <div class="customer-info">
+                <strong class="customer-name">${customer.nombre}</strong>
+                <span class="customer-phone">${customer.telefono}</span>
+                <span class="customer-address">${customer.direccion || 'Sin dirección'}</span>
+            </div>
+            <div class="customer-debt ${totalDebt > 0 ? 'has-debt' : ''}">
+                ${totalDebt > 0 ? `Debe: $${totalDebt.toFixed(2)}` : 'Sin deudas'}
+            </div>
+            <div class="customer-actions">
+                <button class="btn-secondary small-btn" onclick="app.editCustomer('${customer.id}')"><i class="fas fa-edit"></i></button>
+                <button class="btn-danger small-btn" onclick="app.deleteCustomer('${customer.id}')"><i class="fas fa-trash"></i></button>
+                <button class="btn-primary small-btn" onclick="app.generarEstadoCuentaCliente('${customer.id}')">
+                    <i class="fas fa-file-pdf"></i> Estado de Cuenta
+                </button>
+            </div>
+        </div>`;
+}).join('');
+
     }
     searchCustomers(query) {
         const lowerQuery = query.toLowerCase();
@@ -1659,6 +1710,7 @@ class MariSportApp {
         displayContainer.innerHTML = productsHtml || '<p class="empty-message">No hay productos seleccionados.</p>';
         totalInput.value = currentTotal.toFixed(2);
     }
+
     async handleCreditSaleSubmit(e) {
         e.preventDefault();
         const customerId = document.getElementById('credit-customer').value;
@@ -1820,6 +1872,182 @@ class MariSportApp {
     }
     
 } // Fin de la clase MariSportApp
+function generarPDFEstadoCuenta({ cliente, ventasCliente, abonosCliente }) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const today = new Date().toLocaleDateString();
+
+    // Encabezado principal
+    doc.setFontSize(18);
+    doc.text("Estado de Cuenta", 14, 16);
+    doc.setFontSize(12);
+    doc.text("Mari Sport", 14, 24);
+    doc.setFontSize(11);
+    doc.text(`Fecha: ${today}`, 150, 16);
+
+    // Info cliente
+    let y = 33;
+    doc.setFontSize(12);
+    doc.text(`Cliente: ${cliente.nombre || ''}`, 14, y);
+    y += 7;
+    doc.text(`Teléfono: ${cliente.telefono || 'N/A'}`, 14, y);
+    y += 7;
+    doc.text(`Dirección: ${cliente.direccion || 'N/A'}`, 14, y);
+    y += 10;
+
+    ventasCliente.forEach((venta, idx) => {
+        doc.setFontSize(12);
+        doc.setTextColor(54, 162, 235);
+        doc.text(`${idx + 1}. Venta fiada: ${venta.fecha_inicio}  |  Estado: ${venta.estado?.toUpperCase() || ''}`, 14, y);
+        y += 6;
+        doc.setFontSize(11);
+        doc.setTextColor(60, 60, 60);
+
+        // TABLA de productos
+        let productos = [];
+        try {
+            productos = Array.isArray(venta.productos_parsed) ? venta.productos_parsed : JSON.parse(venta.productos || "[]");
+        } catch (e) { productos = []; }
+
+        doc.autoTable({
+            head: [["Producto", "Cantidad", "Precio U.", "Subtotal"]],
+            body: productos.map(p => [
+                p.nombre,
+                p.quantity,
+                `$${Number(p.precio).toFixed(2)}`,
+                `$${(Number(p.precio) * Number(p.quantity)).toFixed(2)}`
+            ]),
+            startY: y,
+            theme: 'grid',
+            headStyles: { fillColor: [54, 162, 235], halign: 'center' },
+            bodyStyles: { halign: 'center' },
+            margin: { left: 18, right: 12 },
+            styles: { fontSize: 10 }
+        });
+
+        y = doc.autoTable.previous.finalY + 4;
+
+        // Totales venta
+        doc.setFontSize(11);
+        doc.setTextColor(20, 20, 20);
+        doc.text(`Total: $${Number(venta.total).toFixed(2)}   |   Abono inicial: $${Number(venta.abono_inicial).toFixed(2)}   |   Saldo pendiente: $${Number(venta.saldo_pendiente).toFixed(2)}`, 18, y);
+        y += 7;
+
+        // Historial de abonos
+        const abonosVenta = abonosCliente.filter(a => a.venta_id === venta.id);
+        if (abonosVenta.length > 0) {
+            doc.setFontSize(10);
+            doc.setTextColor(0, 120, 0);
+            doc.text("Abonos:", 22, y);
+            abonosVenta.forEach((abono, ai) => {
+                doc.text(`${abono.fecha_abono}: $${Number(abono.monto).toFixed(2)}`, 40, y);
+                y += 5;
+            });
+        }
+        y += 7;
+        doc.setTextColor(0, 0, 0);
+        // Salto de página si se pasa
+        if (y > 260) { doc.addPage(); y = 20; }
+    });
+
+    doc.save(`estado-cuenta-${cliente.nombre.replace(/ /g, '_')}-${today.replace(/\//g, '-')}.pdf`);
+}
+
+
+//---------------------------------------------------------------------------------------------//
+
+        
+       function generarPDFAbono({ cliente, sale, abono, abonos }) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const today = new Date().toLocaleDateString();
+
+    doc.setFontSize(18);
+    doc.text("Comprobante de Abono", 14, 16);
+    doc.setFontSize(12);
+    doc.text("Mari Sport", 14, 24);
+    doc.setFontSize(11);
+    doc.text(`Fecha emisión: ${today}`, 150, 16);
+
+    doc.setFontSize(12);
+    doc.text(`Cliente: ${cliente?.nombre || ''}`, 14, 34);
+    doc.text(`Teléfono: ${cliente?.telefono || 'N/A'}`, 14, 40);
+
+    doc.setFontSize(11);
+    doc.text(`Venta a crédito: ${sale.fecha_inicio}`, 14, 47);
+
+    doc.setFontSize(12);
+    doc.setTextColor(0, 120, 0);
+    doc.text(`ABONO REALIZADO: $${Number(abono.monto).toFixed(2)} (${abono.fecha_abono})`, 14, 56);
+
+    doc.setFontSize(11);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`Saldo pendiente actual: $${Number(sale.saldo_pendiente).toFixed(2)}`, 14, 65);
+
+    doc.setFontSize(10);
+    doc.setTextColor(60, 60, 60);
+    doc.text("Historial de abonos:", 14, 72);
+
+    let y = 78;
+    abonos.forEach((a, i) => {
+        doc.text(`${i + 1}. ${a.fecha_abono}: $${Number(a.monto).toFixed(2)}`, 20, y);
+        y += 5;
+        if (y > 260) { doc.addPage(); y = 20; }
+    });
+
+    doc.save(`abono-marisport-${today.replace(/\//g, '-')}.pdf`);
+}
+//-----------------------------------------------------------------------------------------------//
+
+function generarPDFVenta({ productos, cliente = null, total, fecha, tipo = 'contado', abono_inicial = 0, saldo_pendiente = 0 }) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const today = new Date().toLocaleDateString();
+
+    doc.setFontSize(18);
+    doc.text("Comprobante de Venta", 14, 16);
+    doc.setFontSize(12);
+    doc.text("Mari Sport", 14, 24);
+    doc.setFontSize(11);
+    doc.text(`Fecha emisión: ${today}`, 150, 16);
+
+    if (cliente) {
+        doc.setFontSize(12);
+        doc.text(`Cliente: ${cliente.nombre || ''}`, 14, 34);
+        doc.text(`Teléfono: ${cliente.telefono || ''}`, 14, 40);
+    }
+    doc.setFontSize(11);
+    doc.text(`Tipo: ${tipo === 'credito' ? 'Venta a Crédito' : 'Contado'}`, 14, 48);
+
+    doc.autoTable({
+        head: [["Producto", "Cantidad", "Precio U.", "Subtotal"]],
+        body: productos.map(p => [
+            p.nombre,
+            p.quantity,
+            `$${Number(p.precio).toFixed(2)}`,
+            `$${(Number(p.precio) * Number(p.quantity)).toFixed(2)}`
+        ]),
+        startY: 54,
+        theme: 'grid',
+        headStyles: { fillColor: [54, 162, 235], halign: 'center' },
+        bodyStyles: { halign: 'center' },
+        margin: { left: 18, right: 12 },
+        styles: { fontSize: 10 }
+    });
+
+    let y = doc.autoTable.previous.finalY + 7;
+    doc.setFontSize(12);
+    doc.text(`Total: $${Number(total).toFixed(2)}`, 14, y);
+
+    if (tipo === 'credito') {
+        doc.text(`Abono inicial: $${Number(abono_inicial).toFixed(2)}`, 14, y + 7);
+        doc.text(`Saldo pendiente: $${Number(saldo_pendiente).toFixed(2)}`, 14, y + 14);
+    }
+
+    doc.save(`venta-marisport-${today.replace(/\//g, '-')}.pdf`);
+}
+
+
 
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new MariSportApp();

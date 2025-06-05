@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mari Sport - Tu tienda deportiva</title>
@@ -133,19 +136,22 @@
                 </div>
                 
                 <div class="inventory-actions">
-                    <button class="btn-secondary" id="add-product-btn">
-                        <i class="fas fa-plus"></i> Agregar Producto
-                    </button>
-                    <button class="btn-success" id="register-purchase-btn" style="margin-left: 1rem;">
-                        <i class="fas fa-shopping-basket"></i> Registrar Compra
-                    </button>
-                    <button class="btn-warning" id="manage-receptions-btn" style="margin-left: 1rem;">
-                        <i class="fas fa-truck-loading"></i> Gestionar Recepciones
-                    </button>
-                    <button class="btn-primary" id="manage-categories-btn" style="margin-left: 1rem;">
-                        <i class="fas fa-tags"></i> Gestionar Categorías
-                    </button>
-                </div>
+    <button class="btn-accion-inventario" id="add-product-btn">
+        <i class="fas fa-plus"></i> Agregar Producto
+    </button>
+    <button class="btn-accion-inventario" id="register-purchase-btn">
+        <i class="fas fa-shopping-basket"></i> Registrar Compra
+    </button>
+    <button class="btn-accion-inventario" id="manage-receptions-btn">
+        <i class="fas fa-truck-loading"></i> Gestionar Recepciones
+    </button>
+    <button class="btn-accion-inventario" id="manage-categories-btn">
+        <i class="fas fa-tags"></i> Gestionar Categorías
+    </button>
+    <button class="btn-accion-inventario" id="view-all-purchases-btn">
+        <i class="fas fa-history"></i> Ver Historial de Compras
+    </button>
+</div>
                 
                 <div class="inventory-table-container">
                     <table class="inventory-table" id="inventory-table">
@@ -252,6 +258,9 @@
                     </button>
                     <button class="credit-tab" data-credit-section="tracking">
                         <i class="fas fa-chart-line"></i> Seguimiento </button>
+                        <button class="btn-info small-btn" onclick="app.generateCustomerStatementPDF('${customer.id}')" title="Generar Estado de Cuenta">
+    <i class="fas fa-file-invoice"></i> Estado de Cuenta
+</button>
                 </div>
 
                 <div id="customers" class="credit-subsection active">
@@ -267,6 +276,7 @@
                     </div>
                     
                     <div class="customers-grid" id="customers-grid"></div>
+                    
                 </div>
 
                 <div id="credit-sales" class="credit-subsection">

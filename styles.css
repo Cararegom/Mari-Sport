@@ -1287,3 +1287,86 @@ body {
   color: #fff;
   border-bottom: 2px solid #667eea;
 }
+/* Estilos generales para los botones de acción en inventario */
+.inventory-actions {
+    display: flex; /* Para alinear los botones en fila */
+    flex-wrap: wrap; /* Permitir que los botones pasen a la siguiente línea si no caben */
+    gap: 12px; /* Espacio entre botones, un poco más si son más anchos */
+    margin-bottom: 20px; /* Espacio debajo del grupo de botones */
+    align-items: center; /* Alinear verticalmente por si tienen alturas ligeramente diferentes */
+}
+
+.btn-accion-inventario {
+    padding: 10px 20px; /* Aumenta el padding horizontal para darles más forma ovalada */
+    border: none;
+    border-radius: 25px; /* ESTA ES LA CLAVE: Un valor alto para redondear completamente los extremos */
+    color: white;
+    font-size: 14px;
+    font-weight: 500; /* Un poco más de peso a la fuente */
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.1s ease, box-shadow 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15); /* Sombra un poco más pronunciada */
+    text-decoration: none; /* Por si se usa con etiquetas <a> */
+    line-height: 1.5; /* Mejorar alineación vertical del texto */
+}
+
+.btn-accion-inventario i {
+    font-size: 1.1em; 
+}
+
+.btn-accion-inventario:hover {
+    opacity: 0.9;
+    transform: translateY(-2px); /* Efecto hover más notable */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.btn-accion-inventario:active {
+    transform: translateY(0px);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+/* Colores específicos (ajusta a tu paleta) */
+
+/* Botón "Agregar Producto" (gris/secundario) */
+#add-product-btn {
+    background-color: #6c757d; 
+}
+#add-product-btn:hover {
+    background-color: #5a6268;
+}
+
+/* Botón "Registrar Compra" (verde) */
+#register-purchase-btn {
+    background-color: #28a745; 
+}
+#register-purchase-btn:hover {
+    background-color: #218838;
+}
+
+/* Botón "Gestionar Recepciones" (amarillo/naranja) */
+#manage-receptions-btn {
+    background-color: #ffc107; 
+    color: #212529; 
+}
+#manage-receptions-btn:hover {
+    background-color: #e0a800;
+}
+
+/* Botón "Gestionar Categorías" (azul) */
+#manage-categories-btn {
+    background-color: #007bff; 
+}
+#manage-categories-btn:hover {
+    background-color: #0056b3;
+}
+
+/* Botón "Ver Historial de Compras" (turquesa/info - si lo usas) */
+#view-all-purchases-btn {
+    background-color: #17a2b8; 
+}
+#view-all-purchases-btn:hover {
+    background-color: #117a8b;
+}
