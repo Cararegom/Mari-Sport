@@ -70,7 +70,7 @@
                         <div class="cart-items" id="cart-items"></div>
                         <div class="cart-total">
                             <div class="total-line">
-                                <span>Total: $<span id="cart-total">0.00</span></span>
+                                <span>Total: $<span id="cart-total-display">0.00</span></span>
                             </div>
                         </div>
                         
@@ -354,12 +354,17 @@
                         <label for="product-category">Categoría</label>
                         <select id="product-category" required>
                             <option value="">Seleccionar...</option>
-                            </select>
+                        </select>
                     </div>
                     
                     <div class="form-group">
                         <label for="product-price">Precio de Venta</label>
                         <input type="number" id="product-price" step="0.01" min="0" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="product-stock">Stock Inicial / Actual</label>
+                        <input type="number" id="product-stock" min="0" value="0" class="form-control">
                     </div>
                     
                     <div class="form-group">
@@ -374,7 +379,8 @@
                         <div class="size-checkboxes">
                             <label><input type="checkbox" value="XS"> XS</label>
                             <label><input type="checkbox" value="S"> S</label>
-                            <label><input type="checkbox" value="M" checked> M</label> <label><input type="checkbox" value="L"> L</label>
+                            <label><input type="checkbox" value="M" checked> M</label>
+                            <label><input type="checkbox" value="L"> L</label>
                             <label><input type="checkbox" value="XL"> XL</label>
                         </div>
                     </div>
@@ -391,6 +397,8 @@
                 </form>
             </div>
         </div>
+       
+
 
         <div id="customer-modal" class="modal">
             <div class="modal-content">
@@ -529,45 +537,70 @@
             </div>
         </div>
 
-        <div id="purchase-modal" class="modal">
-            <div class="modal-content">
-                <span class="close" id="close-purchase-modal">&times;</span>
-                <h3>Registrar Compra de Mercancía</h3>
-                <form id="purchase-form">
-                    <div class="form-group">
-                        <label for="purchase-product">Producto Comprado</label>
-                        <select id="purchase-product" required>
-                            <option value="">Seleccionar producto...</option>
-                            </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="purchase-quantity">Cantidad Comprada</label>
-                        <input type="number" id="purchase-quantity" min="1" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="purchase-cost-price">Precio de Compra Unitario</label>
-                        <input type="number" id="purchase-cost-price" step="0.01" min="0" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="purchase-date">Fecha de Compra</label>
-                        <input type="date" id="purchase-date" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="purchase-supplier">Proveedor (opcional)</label>
-                        <input type="text" id="purchase-supplier" placeholder="Nombre del proveedor">
-                    </div>
-                    <div class="form-group">
-                        <label for="purchase-notes">Notas de Compra (opcional)</label>
-                        <textarea id="purchase-notes" rows="2"></textarea>
-                    </div>
-                    <div class="form-actions">
-                        <button type="button" class="btn-secondary" id="cancel-purchase">Cancelar</button>
-                        <button type="submit" class="btn-primary">Registrar Compra</button>
-                    </div>
-                </form>
-            </div>
-        </div>
+<div id="purchase-modal" class="modal">
+    <div class="modal-content large">
+        <span class="close" id="close-purchase-modal">&times;</span>
+        <h3><i class="fas fa-shopping-basket" style="margin-right: 8px;"></i>Registrar Compra de Mercancía</h3>
 
+        <form id="purchase-form">
+            <div class="purchase-modal-layout">
+
+                <div class="purchase-column-left">
+                    <div class="section-title">
+                        <i class="fas fa-plus-circle"></i>
+                        <h4>Añadir Productos a la Compra</h4>
+                    </div>
+                    <div id="purchase-product-selector" class="credit-products-selector">
+                        </div>
+                </div>
+
+                <div class="purchase-column-right">
+                    <fieldset class="form-fieldset">
+                        <legend class="fieldset-legend">
+                            <i class="fas fa-info-circle"></i> Información General
+                        </legend>
+                        <div class="form-group">
+                            <label for="purchase-date">Fecha de Compra</label>
+                            <input type="date" id="purchase-date" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="purchase-supplier">Proveedor (opcional)</label>
+                            <input type="text" id="purchase-supplier" placeholder="Nombre del proveedor">
+                        </div>
+                    </fieldset>
+
+                    <div class="section-title">
+                        <i class="fas fa-clipboard-list"></i>
+                        <h4>Resumen de la Compra</h4>
+                    </div>
+                    <div class="purchase-list-container">
+                        <div class="purchase-list-header">
+                            <span>Producto</span>
+                            <span>Cant. / Costo</span>
+                        </div>
+                        <div id="selected-purchase-items">
+                            <p class="empty-message">Añade productos desde la izquierda.</p>
+                        </div>
+                    </div>
+
+                    <div class="total-line" style="margin-top: 1rem; text-align: right; font-weight: bold; font-size: 1.1em;">
+                        <span>Costo Total: $<span id="purchase-total-cost">0.00</span></span>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 1.5rem;">
+                        <label for="purchase-notes">Notas de Compra (opcional)</label>
+                        <textarea id="purchase-notes" rows="2" placeholder="Añade cualquier detalle relevante aquí..."></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-actions" style="margin-top: 20px;">
+                <button type="button" class="btn-secondary" id="cancel-purchase">Cancelar</button>
+                <button type="submit" class="btn-primary">Registrar Compra</button>
+            </div>
+        </form>
+    </div>
+</div>
         <div id="reception-management-modal" class="modal">
             <div class="modal-content large">
                 <span class="close" id="close-reception-management-modal">&times;</span>

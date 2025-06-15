@@ -1370,3 +1370,112 @@ body {
 #view-all-purchases-btn:hover {
     background-color: #117a8b;
 }
+/* ================================================= */
+/* ESTILOS MEJORADOS PARA EL MODAL DE COMPRA         */
+/* ================================================= */
+
+/* Layout principal de dos columnas */
+.purchase-modal-layout {
+    display: flex;
+    gap: 24px;
+    width: 100%;
+}
+
+.purchase-column-left {
+    flex: 1;
+    min-width: 300px;
+}
+
+.purchase-column-right {
+    flex: 1.2; /* Le damos un poco más de espacio a la columna derecha */
+    display: flex;
+    flex-direction: column;
+}
+
+/* Títulos de sección con íconos */
+.section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    color: var(--primary-color);
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 8px;
+}
+
+.section-title i {
+    font-size: 1.1em;
+}
+
+.section-title h4 {
+    margin: 0;
+    font-size: 1em;
+    font-weight: 600;
+}
+
+/* Estilos para agrupar campos de información */
+.form-fieldset {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 20px;
+}
+
+.fieldset-legend {
+    padding: 0 10px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Estilos para la lista de productos seleccionados */
+.purchase-list-container {
+    background-color: #f9f9f9;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px;
+    flex-grow: 1; /* Permite que este contenedor crezca */
+}
+
+.purchase-list-header {
+    display: flex;
+    justify-content: space-between;
+    font-weight: bold;
+    color: var(--text-secondary);
+    padding: 0 10px 8px 10px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.9em;
+}
+
+/* El selector de productos necesita una altura para hacer scroll */
+#purchase-product-selector {
+    max-height: 450px;
+    overflow-y: auto;
+    padding-right: 8px; /* Espacio para la barra de scroll */
+}
+
+/* Ajustes para hacer el layout adaptable a pantallas pequeñas */
+@media (max-width: 900px) {
+    .purchase-modal-layout {
+        flex-direction: column;
+    }
+    
+    #purchase-product-selector {
+        max-height: 250px; /* Reducimos la altura en móvil */
+    }
+}
+/* ================================================================= */
+/* AJUSTE DE ANCHO PARA MODALES GRANDES (COMPRA Y OTROS)             */
+/* ================================================================= */
+
+.modal-content.large {
+    /* Aumentamos el ancho máximo para pantallas de escritorio. 
+       Puedes ajustar este valor si lo quieres aún más grande. */
+    max-width: 1100px; 
+    
+    /* Hacemos que ocupe casi todo el ancho en móviles, pero sin pegarse a los bordes.
+       Esto asegura la buena visualización en la app móvil. */
+    width: 95%;
+}

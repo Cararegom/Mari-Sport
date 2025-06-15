@@ -14,7 +14,7 @@ class MariSportApp {
         this.categories = [];
         this.purchases = []; // Compras de mercancía
         this.financialMovements = []; // Ingresos y Egresos
-
+        this.currentPurchaseItems = [];
         this.currentEditingProduct = null;
         this.currentEditingCustomer = null;
         this.currentCreditSale = null;
@@ -239,16 +239,107 @@ class MariSportApp {
             this.purchases = [];
         }
     }
-
-    openPurchaseModal() {
-        const modal = document.getElementById('purchase-modal');
-        if (!modal) return;
-        document.getElementById('purchase-form').reset();
-        this.populateProductsForPurchaseModal();
-        document.getElementById('purchase-date').valueAsDate = new Date();
-        modal.style.display = 'block';
+//=================================================
+// FUNCIÓN CENTRAL PARA FORMATEAR MONEDA
+//=================================================
+formatCurrency(number) {
+    // Si el número no es válido, devuelve $0
+    if (isNaN(number) || number === null) {
+        number = 0;
     }
 
+    // Usamos el formateador de números nativo de JavaScript para moneda colombiana (COP)
+    // y le indicamos que no queremos dígitos decimales (minimumFractionDigits: 0).
+    return new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(number);
+}
+openPurchaseModal() {
+        const modal = document.getElementById('purchase-modal');
+        if (!modal) return;
+        
+        document.getElementById('purchase-form').reset();
+        document.getElementById('purchase-date').valueAsDate = new Date();
+        this.currentPurchaseItems = [];
+        this.renderPurchaseList();
+        
+        const selector = document.getElementById('purchase-product-selector');
+        if (!selector) {
+            console.error("El elemento 'purchase-product-selector' no se encontró en el HTML.");
+            return;
+        }
+
+        // Construimos todo el HTML de los productos y lo insertamos de una vez
+        const productsHTML = this.products.map(product => {
+            // Usamos comillas simples para el string y dobles para los atributos HTML internos
+            return `
+                <div class="credit-product-card" onclick="app.addProductToPurchaseList('${product.id}')">
+                    <img src="${product.imagen_url || 'https://via.placeholder.com/80'}" alt="${product.nombre}" onerror="this.src='https://via.placeholder.com/80';this.onerror=null;">
+                    <div class="name">${product.nombre}</div>
+                    <div class="stock">Stock actual: ${product.stock}</div>
+                </div>
+            `;
+        }).join('');
+
+        selector.innerHTML = productsHTML;
+        modal.style.display = 'block';
+    }
+// NUEVA FUNCIÓN 1
+addProductToPurchaseList(productId) {
+    const product = this.products.find(p => p.id === productId);
+    if (!product) return;
+
+    // Evitar duplicados en la lista
+    if (this.currentPurchaseItems.some(item => item.id === productId)) {
+        this.showNotification('Este producto ya está en la lista de compra.', 'warning', 2000);
+        return;
+    }
+
+    this.currentPurchaseItems.push({
+        id: product.id,
+        nombre: product.nombre,
+        cantidad_comprada: 1,
+        precio_compra_unitario: 0
+    });
+    this.renderPurchaseList();
+}
+
+// NUEVA FUNCIÓN 2
+renderPurchaseList() {
+        const container = document.getElementById('selected-purchase-items');
+        const totalCostEl = document.getElementById('purchase-total-cost');
+        let totalCost = 0;
+
+        if (this.currentPurchaseItems.length === 0) {
+            container.innerHTML = '<p class="empty-message">Añade productos del selector de arriba.</p>';
+            totalCostEl.textContent = '0.00';
+            return;
+        }
+
+        container.innerHTML = this.currentPurchaseItems.map((item, index) => {
+            const itemTotal = (item.cantidad_comprada || 0) * (item.precio_compra_unitario || 0);
+            totalCost += itemTotal;
+            return `
+                <div class="purchase-item-row">
+                    <span>${item.nombre}</span>
+                    <div class="purchase-item-inputs">
+                        <label>Cant:</label>
+                        <input type="number" value="${item.cantidad_comprada}" min="1" onchange="app.updatePurchaseItem(${index}, 'cantidad', this.value)">
+                        <label>Costo U:</label>
+                        <input type="number" value="${item.precio_compra_unitario}" step="0.01" min="0" onchange="app.updatePurchaseItem(${index}, 'costo', this.value)">
+                        <button type="button" class="remove-btn" onclick="app.removePurchaseItem(${index})">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        totalCostEl.textContent = totalCost.toFixed(2);
+    }
     closePurchaseModal() {
         const modal = document.getElementById('purchase-modal');
         if (modal) modal.style.display = 'none';
@@ -265,86 +356,104 @@ class MariSportApp {
             select.appendChild(option);
         });
     }
-
-    async handlePurchaseSubmit(e) {
-        e.preventDefault();
-        const productoId = document.getElementById('purchase-product').value;
-        const cantidadComprada = parseInt(document.getElementById('purchase-quantity').value);
-        const precioCompraUnitario = parseFloat(document.getElementById('purchase-cost-price').value);
-        const fechaCompra = document.getElementById('purchase-date').value;
-        const proveedor = document.getElementById('purchase-supplier').value;
-        const notasCompra = document.getElementById('purchase-notes').value;
-
-        if (!productoId || !cantidadComprada || isNaN(precioCompraUnitario) || !fechaCompra) {
-            return this.showNotification('Completa los campos obligatorios (Producto, Cantidad, Precio, Fecha).', 'warning');
+// NUEVA FUNCIÓN DE AYUDA 1
+    updatePurchaseItem(index, field, value) {
+        if (!this.currentPurchaseItems[index]) return;
+        
+        if (field === 'cantidad') {
+            this.currentPurchaseItems[index].cantidad_comprada = parseInt(value, 10) || 1;
+        } else if (field === 'costo') {
+            this.currentPurchaseItems[index].precio_compra_unitario = parseFloat(value) || 0;
         }
-        if (cantidadComprada <= 0 || precioCompraUnitario < 0) {
-            return this.showNotification('Cantidad y Precio deben ser positivos.', 'warning');
-        }
+        this.renderPurchaseList(); // Vuelve a dibujar la lista para actualizar el total
+    }
 
-        const purchaseData = {
-            producto_id: productoId,
-            cantidad_comprada: cantidadComprada,
-            precio_compra_unitario: precioCompraUnitario,
-            fecha_compra: fechaCompra,
-            proveedor: proveedor || null,
-            notas_compra: notasCompra || null,
-            cantidad_recibida: 0, 
-            estado_recepcion: 'pendiente'
-        };
+    // NUEVA FUNCIÓN DE AYUDA 2
+    removePurchaseItem(index) {
+        this.currentPurchaseItems.splice(index, 1);
+        this.renderPurchaseList();
+    }
+async handlePurchaseSubmit(e) {
+    e.preventDefault();
+    const fechaCompra = document.getElementById('purchase-date').value;
+    const proveedor = document.getElementById('purchase-supplier').value;
+    const notasCompra = document.getElementById('purchase-notes').value;
 
-        try {
-            const { data: savedPurchase, error: purchaseError } = await this.supabase
-                .from('compras')
-                .insert([purchaseData])
-                .select()
-                .single();
+    if (!fechaCompra) {
+        return this.showNotification('La fecha de compra es obligatoria.', 'warning');
+    }
+    if (this.currentPurchaseItems.length === 0) {
+        return this.showNotification('Debes agregar al menos un producto a la compra.', 'warning');
+    }
 
-            if (purchaseError) throw purchaseError;
-
-            const totalPurchaseCost = cantidadComprada * precioCompraUnitario;
-            const product = this.products.find(p => p.id === productoId);
-            
-            console.log("Registrando egreso:", { // Log para depuración
-                tipo: 'egreso',
-                descripcion: `Compra de: ${product ? product.nombre : 'Producto ID ' + productoId}`,
-                monto: totalPurchaseCost,
-                fecha: fechaCompra,
-                referencia_id: savedPurchase.id,
-                tabla_referencia: 'compras'
-            });
-
-            const { error: movementError } = await this.supabase
-                .from('movimientos_financieros')
-                .insert([{
-                    tipo: 'egreso',
-                    descripcion: `Compra de: ${product ? product.nombre : 'Producto ID ' + productoId}`,
-                    monto: totalPurchaseCost,
-                    fecha: fechaCompra,
-                    referencia_id: savedPurchase.id,
-                    tabla_referencia: 'compras'
-                }]);
-            
-            if (movementError) {
-                console.error("Error al registrar egreso financiero:", movementError);
-                // No lanzar error aquí para que la compra se considere registrada, pero notificar
-                this.showNotification('Compra registrada, pero hubo un error al registrar el egreso: ' + movementError.message, 'warning');
-            } else {
-                 console.log("Egreso registrado con éxito.");
-            }
-
-            await this.loadPurchases();
-            await this.loadFinancialMovements(); // Es crucial recargar esto
-            this.updateStats(); 
-
-            this.showNotification('Compra registrada. Pendiente de recepción.', 'success');
-            this.closePurchaseModal();
-        } catch (error) {
-            console.error("Error en handlePurchaseSubmit:", error);
-            this.showNotification('Error al registrar la compra: ' + error.message, 'error');
+    // Validar que todos los items tengan cantidad y precio válidos
+    for (const item of this.currentPurchaseItems) {
+        if (item.cantidad_comprada <= 0 || item.precio_compra_unitario < 0) {
+            return this.showNotification(`La cantidad y el costo para "${item.nombre}" deben ser positivos.`, 'warning');
         }
     }
-    
+
+    const costoTotal = this.currentPurchaseItems.reduce((sum, item) => sum + (item.cantidad_comprada * item.precio_compra_unitario), 0);
+
+    try {
+        // 1. Insertar la orden de compra principal
+        const { data: orden, error: ordenError } = await this.supabase
+            .from('ordenes_compra')
+            .insert([{
+                fecha_compra: fechaCompra,
+                proveedor: proveedor || null,
+                notas_compra: notasCompra || null,
+                costo_total: costoTotal
+            }])
+            .select()
+            .single();
+
+        if (ordenError) throw ordenError;
+
+        // 2. Preparar los detalles de la compra
+        const detallesData = this.currentPurchaseItems.map(item => ({
+            orden_id: orden.id,
+            producto_id: item.id,
+            cantidad_comprada: item.cantidad_comprada,
+            precio_compra_unitario: item.precio_compra_unitario
+        }));
+
+        // 3. Insertar todos los detalles
+        const { error: detallesError } = await this.supabase
+            .from('detalles_compra')
+            .insert(detallesData);
+
+        if (detallesError) throw detallesError;
+
+        // 4. Registrar el egreso financiero
+        const { error: movementError } = await this.supabase
+            .from('movimientos_financieros')
+            .insert([{
+                tipo: 'egreso',
+                descripcion: `Compra a ${proveedor || 'varios'} (Orden ID: ${orden.id.substring(0, 8)})`,
+                monto: costoTotal,
+                fecha: fechaCompra,
+                referencia_id: orden.id,
+                tabla_referencia: 'ordenes_compra'
+            }]);
+
+        if (movementError) {
+            console.error("Error al registrar egreso:", movementError);
+            this.showNotification('Compra registrada, pero hubo un error al crear el registro financiero.', 'warning');
+        }
+
+        this.showNotification('Compra registrada exitosamente.', 'success');
+
+        // Recargar datos relevantes
+        await this.loadFinancialMovements();
+        this.updateStats();
+        this.closePurchaseModal();
+
+    } catch (error) {
+        console.error("Error al registrar la compra:", error);
+        this.showNotification('Error al registrar la compra: ' + error.message, 'error');
+    }
+}    
     // --- NUEVO: Historial de Todas las Compras ---
     toggleAllPurchasesView() {
         const container = document.getElementById('all-purchases-container');
@@ -1026,11 +1135,10 @@ generarPDFVenta({
 
         console.log("Total Ingresos Calculados:", totalIngresos, "Total Egresos Calculados:", totalEgresos, "Balance:", balanceGeneral);
 
-        document.getElementById('total-sales').textContent = `$${totalIngresos.toFixed(2)}`; 
-        const totalExpensesEl = document.getElementById('total-expenses');
-        if (totalExpensesEl) totalExpensesEl.textContent = `$${totalEgresos.toFixed(2)}`;
-        const generalBalanceEl = document.getElementById('general-balance');
-        if (generalBalanceEl) generalBalanceEl.textContent = `$${balanceGeneral.toFixed(2)}`;
+        document.getElementById('total-sales').textContent = this.formatCurrency(totalIngresos);
+if (totalExpensesEl) totalExpensesEl.textContent = this.formatCurrency(totalEgresos);
+if (generalBalanceEl) generalBalanceEl.textContent = this.formatCurrency(balanceGeneral);
+document.getElementById('avg-sale').textContent = this.formatCurrency(avgSaleValue);
     }
 
     // --- Renderizado y UI ---
@@ -1142,7 +1250,7 @@ generarPDFVenta({
         }
     }
 
-    openProductModal(productId = null) {
+openProductModal(productId = null) {
         this.currentEditingProduct = productId; 
         this.populateCategorySelects(); 
         
@@ -1150,7 +1258,7 @@ generarPDFVenta({
         const form = document.getElementById('product-form');
         const title = document.getElementById('modal-title');
         const imagePreview = document.getElementById('image-preview');
-        const stockInput = document.getElementById('product-stock'); // Obtener el input de stock
+        const stockInput = document.getElementById('product-stock');
 
         form.reset(); 
         if(imagePreview) imagePreview.innerHTML = '';
@@ -1169,7 +1277,7 @@ generarPDFVenta({
             document.getElementById('product-price').value = product.precio;
             document.getElementById('product-image').value = product.imagen_url || '';
             document.getElementById('product-colors').value = product.color || ''; 
-            if (stockInput) stockInput.value = product.stock; // Mostrar stock actual
+            if (stockInput) stockInput.value = product.stock;
             
             const currentSizes = product.talla ? product.talla.split(',').map(s => s.trim()) : [];
             document.querySelectorAll('.size-checkboxes input[type="checkbox"]').forEach(cb => {
@@ -1180,16 +1288,18 @@ generarPDFVenta({
         } else {
             title.textContent = 'Agregar Producto';
             this.currentEditingProduct = null; 
-            if (stockInput) stockInput.value = 0; // Stock 0 para nuevos productos
+            if (stockInput) stockInput.value = 0;
         }
-        // Ocultar o deshabilitar el campo de stock en el modal de producto si se gestiona por recepciones
+        
+        // MODIFICACIÓN: El código que ocultaba el campo de stock ha sido eliminado.
+        // Ahora el campo siempre estará visible y editable.
         if (stockInput) {
-             stockInput.readOnly = true; // Hacerlo de solo lectura
-             stockInput.parentElement.style.display = 'none'; // Ocultarlo
+             stockInput.readOnly = false;
+             stockInput.parentElement.style.display = 'block';
         }
+
         modal.style.display = 'block';
     }
-
     closeProductModal() {
         document.getElementById('product-modal').style.display = 'none';
         this.currentEditingProduct = null;
@@ -1198,12 +1308,14 @@ generarPDFVenta({
         if (imagePreview) imagePreview.innerHTML = '';
     }
 
-    async handleProductSubmit(e) {
+async handleProductSubmit(e) {
         e.preventDefault();
         
         const nombre = document.getElementById('product-name').value;
         const categoria = document.getElementById('product-category').value;
         const precio = parseFloat(document.getElementById('product-price').value);
+        // MODIFICACIÓN 1: Se lee el valor del stock desde el formulario.
+        const stock = parseInt(document.getElementById('product-stock').value, 10);
         const imagen_url = document.getElementById('product-image').value;
         const colors = document.getElementById('product-colors').value;
 
@@ -1215,28 +1327,37 @@ generarPDFVenta({
         }
         if (precio < 0) return this.showNotification('Precio no puede ser negativo.', 'warning');
 
+        // MODIFICACIÓN 2: Se añade una validación para el campo de stock.
+        if (isNaN(stock) || stock < 0) {
+            return this.showNotification('El stock debe ser un número positivo y válido.', 'warning');
+        }
+
+        // MODIFICACIÓN 3: Se incluye el stock en el objeto de datos que se enviará a la base de datos.
         const productData = {
             nombre, categoria, precio,
+            stock: stock, // <-- Stock añadido aquí
             imagen_url: imagen_url || null,
             talla: sizesChecked.join(', '),
             color: colors || null,
         };
 
         try {
-            if (this.currentEditingProduct) { 
+            if (this.currentEditingProduct) {
+                // Al editar, el objeto 'productData' ya contiene el nuevo stock.
                 const { error } = await this.supabase
                     .from('productos')
                     .update(productData) 
                     .eq('id', this.currentEditingProduct);
                 if (error) throw error;
                 this.showNotification('Producto actualizado.', 'success');
-            } else { 
-                productData.stock = 0; 
+            } else {
+                // MODIFICACIÓN 4: Al crear, ya no se fuerza el stock a 0, sino que se usa el valor del formulario.
                 const { error } = await this.supabase
                     .from('productos')
                     .insert([productData]);
                 if (error) throw error;
-                this.showNotification('Producto agregado. Stock inicial: 0.', 'success');
+                // La notificación ahora muestra el stock inicial real.
+                this.showNotification(`Producto agregado. Stock inicial: ${stock}.`, 'success');
             }
             await this.loadProducts();
             this.renderInventory();
@@ -1248,6 +1369,7 @@ generarPDFVenta({
             this.showNotification('Error al guardar producto: ' + error.message, 'error');
         }
     }
+    
     
     editProduct(id) { this.openProductModal(id); }
 
@@ -1276,7 +1398,7 @@ generarPDFVenta({
                 <td><img src="${product.imagen_url || 'https://via.placeholder.com/50'}" alt="${product.nombre}" onerror="this.src='https://via.placeholder.com/50'; this.onerror=null;"></td>
                 <td>${product.nombre}</td>
                 <td>${product.categoria || 'N/A'}</td>
-                <td>$${product.precio ? product.precio.toFixed(2) : '0.00'}</td>
+                <td>${this.formatCurrency(product.precio)}</td>
                 <td>${product.stock !== undefined ? product.stock : 'N/A'}</td>
                 <td>
                     <button class="action-btn edit-btn" onclick="app.editProduct('${product.id}')"><i class="fas fa-edit"></i> Editar</button>
@@ -1296,8 +1418,7 @@ generarPDFVenta({
             card.innerHTML = `
                 <img src="${product.imagen_url || 'https://via.placeholder.com/100'}" alt="${product.nombre}" onerror="this.src='https://via.placeholder.com/100'; this.onerror=null;">
                 <div class="name">${product.nombre}</div>
-                <div class="price">$${product.precio ? product.precio.toFixed(2) : '0.00'}</div>
-                <div class="stock">Stock: ${product.stock > 0 ? product.stock : 'Agotado'}</div>
+                <div class="price">${this.formatCurrency(product.precio)}</div>                <div class="stock">Stock: ${product.stock > 0 ? product.stock : 'Agotado'}</div>
             `;
             if (product.stock > 0) {
                 card.addEventListener('click', () => this.addToCart(product));
@@ -1333,8 +1454,7 @@ generarPDFVenta({
                 <img src="${product.imagen_url || 'https://via.placeholder.com/200'}" alt="${product.nombre}" onerror="this.src='https://via.placeholder.com/200'; this.onerror=null;">
                 <div class="catalog-card-content">
                     <h4 class="catalog-card-name">${product.nombre}</h4>
-                    <p class="catalog-card-price">$${product.precio ? product.precio.toFixed(2) : '0.00'}</p>
-                    <p class="catalog-card-stock">Stock: ${product.stock > 0 ? product.stock : 'Agotado'}</p>
+                    <p class="catalog-card-price">${this.formatCurrency(product.precio)}</p>                    <p class="catalog-card-stock">Stock: ${product.stock > 0 ? product.stock : 'Agotado'}</p>
                     ${product.talla ? `<p class="catalog-card-meta">Tallas: ${product.talla}</p>` : ''}
                     ${product.color ? `<p class="catalog-card-meta">Colores: ${product.color}</p>` : ''}
                 </div>
@@ -1391,8 +1511,7 @@ generarPDFVenta({
             <div class="cart-item">
                 <div class="cart-item-info">
                     <span class="cart-item-name">${item.nombre}</span>
-                    <span class="cart-item-details">$${item.precio ? item.precio.toFixed(2) : '0.00'} ${item.talla ? `- ${item.talla}` : ''} ${item.color ? `- ${item.color}` : ''}</span>
-                </div>
+<span class="cart-item-details">${this.formatCurrency(item.precio)} ...</span>                </div>
                 <div class="cart-item-controls">
                     <button class="qty-btn" onclick="app.updateQuantity(${index}, -1)">-</button>
                     <span class="cart-item-quantity">${item.quantity}</span>
@@ -1404,7 +1523,7 @@ generarPDFVenta({
 
     updateCartTotal() {
         const total = this.cart.reduce((sum, item) => sum + ((item.precio || 0) * item.quantity), 0);
-        document.getElementById('cart-total').textContent = total.toFixed(2);
+document.getElementById('cart-total-display').textContent = this.formatCurrency(total);
         document.getElementById('complete-sale').disabled = this.cart.length === 0;
     }
 
@@ -1420,7 +1539,7 @@ generarPDFVenta({
                 <img src="${product.image || 'https://via.placeholder.com/50'}" alt="${product.name}" onerror="this.src='https://via.placeholder.com/50'; this.onerror=null;">
                 <div class="best-seller-info">
                     <div class="best-seller-name">${product.name}</div>
-                    <div class="best-seller-sales">${product.quantity} vendidos - $${product.revenue ? product.revenue.toFixed(2) : '0.00'}</div>
+<div class="best-seller-sales">${product.quantity} vendidos - ${this.formatCurrency(product.revenue)}</div>
                 </div>
             </div>`).join('');
     }
@@ -1771,8 +1890,7 @@ generarPDFVenta({
                     <div class="credit-sale-body">
                         <p>Fecha: ${new Date(sale.fecha_inicio + "T00:00:00").toLocaleDateString()} / Límite: ${new Date(sale.fecha_limite + "T00:00:00").toLocaleDateString()}</p>
                         <div class="debt-progress"><div class="debt-progress-bar" style="width: ${progress}%;"></div></div>
-                        <p>Total: $${(sale.total || 0).toFixed(2)} | Pagado: $${pagado.toFixed(2)} | Pendiente: $${(sale.saldo_pendiente || 0).toFixed(2)}</p>
-                    </div>
+<p>Total: ${this.formatCurrency(sale.total)} | Pagado: ${this.formatCurrency(pagado)} | Pendiente: ${this.formatCurrency(sale.saldo_pendiente)}</p>                    </div>
                     <div class="credit-sale-actions">
                         ${sale.estado !== 'pagada' ? `<button class="btn-primary small-btn" onclick="app.openPaymentModal('${sale.id}')"><i class="fas fa-hand-holding-usd"></i> Registrar Abono</button>` : ''}
                     </div>
@@ -1790,8 +1908,7 @@ generarPDFVenta({
         
         document.getElementById('debt-info').innerHTML = `
             <h4>Deuda de ${sale.clientes?.nombre || 'Cliente Desc.'}</h4>
-            <p>Total: $${(sale.total||0).toFixed(2)} | Pendiente: $${(sale.saldo_pendiente||0).toFixed(2)}</p>
-            <p>Límite: ${new Date(sale.fecha_limite+"T00:00:00").toLocaleDateString()}</p>`;
+<p>Total: ${this.formatCurrency(sale.total)} | Pendiente: ${this.formatCurrency(sale.saldo_pendiente)}</p>            <p>Límite: ${new Date(sale.fecha_limite+"T00:00:00").toLocaleDateString()}</p>`;
         const paymentAmountInput = document.getElementById('payment-amount');
         paymentAmountInput.max = sale.saldo_pendiente;
         paymentAmountInput.value = sale.saldo_pendiente.toFixed(2);
@@ -1814,42 +1931,61 @@ generarPDFVenta({
         await this.savePayment(paymentData); 
         this.closePaymentModal();
     }
-    renderPendingDebts() {
+renderPendingDebts() {
         const container = document.getElementById('pending-debts');
         if (!container) return;
+        
         const pending = this.creditSales.filter(s => s.estado !== 'pagada');
+        
         if (pending.length === 0) {
-            container.innerHTML = "<p class='empty-message'>No hay deudas pendientes.</p>"; return;
+            container.innerHTML = "<p class='empty-message'>No hay deudas pendientes.</p>";
+            return;
         }
+
         container.innerHTML = pending.map(sale => {
             const customer = sale.clientes;
             const payments = this.payments.filter(p => p.venta_id === sale.id);
-            const today = new Date(); today.setHours(0,0,0,0);
-            const dueDate = new Date(sale.fecha_limite+"T00:00:00");
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const dueDate = new Date(sale.fecha_limite + "T00:00:00");
             const isOverdue = today > dueDate;
             const diffDays = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
             const isDueSoon = diffDays >= 0 && diffDays <= 3;
             let statusClass = isOverdue ? 'overdue' : (isDueSoon ? 'due-soon' : 'active');
             let statusText = isOverdue ? 'VENCIDA' : (isDueSoon ? `VENCE EN ${diffDays} DÍA(S)` : 'ACTIVA');
 
+            // --- SIMPLIFICACIÓN PARA EVITAR ERRORES ---
+            // 1. Generamos el HTML del historial de pagos por separado.
+            let paymentHistoryHtml = '<p class="no-payments">Sin abonos aún.</p>';
+            if (payments.length > 0) {
+                const paymentItems = payments.map(p =>
+                    // Usamos la función formatCurrency en cada monto del historial
+                    `<div>${new Date(p.fecha_abono + "T00:00:00").toLocaleDateString()}: ${this.formatCurrency(p.monto)}</div>`
+                ).join('');
+
+                paymentHistoryHtml = `
+                    <div class="payment-history">
+                        <h5>Historial:</h5>
+                        ${paymentItems}
+                    </div>
+                `;
+            }
+
+            // 2. Ahora, el return principal es mucho más limpio y fácil de leer.
             return `
                 <div class="debt-card ${statusClass}">
                     <div class="debt-header">
                         <span class="debt-customer">${customer?.nombre || 'Cliente Desc.'}</span>
                         <span class="debt-status-tag">${statusText}</span>
                     </div>
-                    <p>Total: $${(sale.total||0).toFixed(2)} | Pendiente: $${(sale.saldo_pendiente||0).toFixed(2)} | Límite: ${dueDate.toLocaleDateString()}</p>
+                    <p>Total: ${this.formatCurrency(sale.total)} | Pendiente: ${this.formatCurrency(sale.saldo_pendiente)} | Límite: ${dueDate.toLocaleDateString()}</p>
                     <button class="btn-primary" onclick="app.openPaymentModal('${sale.id}')"><i class="fas fa-money-bill"></i> Registrar Abono</button>
-                    ${payments.length > 0 ? `
-                        <div class="payment-history">
-                            <h5>Historial:</h5>
-                            ${payments.map(p => `<div>${new Date(p.fecha_abono+"T00:00:00").toLocaleDateString()}: $${(p.monto||0).toFixed(2)}</div>`).join('')}
-                        </div>` 
-                    : '<p class="no-payments">Sin abonos aún.</p>'}
-                </div>`;
+                    
+                    ${paymentHistoryHtml}
+                </div>
+            `;
         }).join('');
-    }
-    renderActiveDebts() { 
+    }    renderActiveDebts() { 
         const container = document.getElementById('active-debts');
         if (!container) return;
         const active = this.creditSales.filter(s => s.estado !== 'pagada');
@@ -1866,9 +2002,9 @@ generarPDFVenta({
     updateTrackingSummary() {
         const totalCredit = this.creditSales.reduce((sum, s) => sum + (s.total || 0), 0);
         const totalPending = this.creditSales.reduce((sum, s) => sum + (s.saldo_pendiente || 0), 0);
-        document.getElementById('total-credit').textContent = `$${totalCredit.toFixed(2)}`;
-        document.getElementById('total-collected').textContent = `$${(totalCredit - totalPending).toFixed(2)}`;
-        document.getElementById('total-pending').textContent = `$${totalPending.toFixed(2)}`;
+        document.getElementById('total-credit').textContent = this.formatCurrency(totalCredit);
+document.getElementById('total-collected').textContent = this.formatCurrency(totalCredit - totalPending);
+document.getElementById('total-pending').textContent = this.formatCurrency(totalPending);
     }
     
 } // Fin de la clase MariSportApp
