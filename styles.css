@@ -1479,3 +1479,243 @@ body {
        Esto asegura la buena visualización en la app móvil. */
     width: 95%;
 }
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+}
+
+.modal-content.large {
+  background-color: #fff;
+  margin: 5% auto;
+  padding: 20px;
+  width: 90%;
+  max-width: 800px;
+  border-radius: 10px;
+  position: relative;
+}
+
+.modal .close {
+  position: absolute;
+  right: 20px;
+  top: 10px;
+  font-size: 24px;
+  cursor: pointer;
+}
+/* Pega esto en tu styles.css, reemplazando los estilos anteriores del historial */
+
+/* Fila principal de cada compra en el historial */
+.purchase-history-main-row {
+    border-bottom: 1px solid #dee2e6; /* Borde inferior sutil */
+    cursor: pointer;
+}
+
+/* Fila de detalles (oculta por defecto) */
+.purchase-history-details-row {
+    display: none; /* Oculta por defecto */
+}
+
+/* Contenedor dentro de la celda de detalles */
+.purchase-history-details-row > td {
+    padding: 0 !important; /* Quitamos el padding de la celda */
+    background-color: #f8f9fa; /* Fondo gris claro para destacar */
+    border: none; /* Sin bordes para que se una con la fila de arriba */
+}
+
+/* Tarjeta interna que contiene la lista de productos */
+.details-card {
+    padding: 1rem 1.5rem; /* Relleno interno */
+    margin: 0.5rem 1rem; /* Margen para que no toque los bordes */
+    background-color: #ffffff; /* Fondo blanco para la tarjeta */
+    border: 1px solid #e9ecef;
+    border-radius: 8px; /* Bordes redondeados */
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.details-card h6 {
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+    font-size: 1em;
+    color: #495057;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 0.5rem;
+}
+
+/* Lista de productos detallados */
+.purchase-details-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+/* Cada item de la lista de productos */
+.purchase-detail-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    font-size: 0.9em;
+}
+
+.purchase-detail-item:not(:last-child) {
+    border-bottom: 1px dashed #e9ecef;
+}
+
+.purchase-detail-item .product-name {
+    font-weight: 500;
+    color: #343a40;
+}
+
+.purchase-detail-item .product-meta {
+    font-family: monospace; /* Fuente monoespaciada para alinear números */
+    color: #6c757d;
+    font-size: 0.95em;
+}
+/*
+  En styles.css, busca todos los estilos para la sección de deudas
+  y reemplázalos con este bloque completo.
+*/
+
+.customer-debt-container {
+    margin-bottom: 0.75rem;
+}
+
+.customer-debt-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.25rem;
+    background-color: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.customer-debt-summary:hover {
+    border-color: #007bff;
+    background-color: #f8faff;
+}
+
+.customer-debt-summary.expanded {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    background-color: #f8faff;
+}
+
+.customer-debt-summary .customer-name {
+    font-weight: 600;
+    font-size: 1.1em;
+    color: #343a40;
+}
+
+.customer-debt-summary .debt-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.customer-debt-summary .total-debt {
+    font-weight: 500;
+    color: #c82333;
+}
+
+.customer-debt-summary .expand-icon {
+    transition: transform 0.2s ease-in-out;
+}
+
+.customer-debt-summary.expanded .expand-icon {
+    transform: rotate(180deg);
+}
+
+.customer-debt-details {
+    display: none;
+    padding: 1rem;
+    background-color: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+}
+
+.sale-card {
+    background: #fff;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+    margin-bottom: 1rem;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    overflow: hidden;
+}
+.sale-card:last-child { margin-bottom: 0; }
+
+.sale-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1.25rem;
+    background-color: #f1f3f5;
+}
+
+.sale-card-header h4 {
+    margin: 0;
+    font-size: 1.05em;
+    color: #495057;
+}
+
+/* Estilos para el estado de vencimiento */
+.sale-card-header .status-tag {
+    font-size: 0.8em;
+    font-weight: 700;
+    padding: 0.25rem 0.6rem;
+    border-radius: 12px;
+    color: #fff;
+}
+.status-tag.status-overdue { background-color: #dc3545; }
+.status-tag.status-due-today { background-color: #ffc107; color: #212529; }
+.status-tag.status-pending { background-color: #6c757d; }
+
+.sale-card-body {
+    padding: 1rem 1.25rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+}
+
+.products-section h5, .payments-section h5 {
+    margin-top: 0; margin-bottom: 0.75rem; color: #343a40;
+    font-size: 1em; padding-bottom: 0.5rem; border-bottom: 1px solid #f1f1f1;
+}
+
+.products-section ul, .payments-section ul {
+    list-style: none; padding: 0; margin: 0;
+    display: flex; flex-direction: column; gap: 0.5rem;
+}
+
+.product-item, .payment-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.5rem; border-radius: 4px; transition: background-color 0.2s;
+}
+.product-item:hover, .payment-item:hover { background-color: #f8f9fa; }
+
+.product-item-name, .payment-item-date { color: #495057; font-size: 0.9em; }
+.product-item-subtotal, .payment-item-amount { font-weight: 600; color: #212529; font-size: 0.9em; }
+
+.sale-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1.25rem;
+    background-color: #f1f3f5;
+    border-top: 1px solid #e9ecef;
+}
+
+.footer-totals {
+    display: flex;
+    gap: 1.5rem;
+    font-size: 0.9em;
+    font-weight: 500;
+}
+.footer-totals .saldo { font-weight: 700; color: #c82333; }

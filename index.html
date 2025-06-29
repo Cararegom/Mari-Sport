@@ -246,22 +246,21 @@
                     <p class="motivational">¡Construye relaciones duraderas con tus clientas!</p>
                 </div>
                 
-                <div class="credit-tabs">
-                    <button class="credit-tab active" data-credit-section="customers">
-                        <i class="fas fa-users"></i> Clientes
-                    </button>
-                    <button class="credit-tab" data-credit-section="credit-sales">
-                        <i class="fas fa-file-invoice-dollar"></i> Ventas Fiadas
-                    </button>
-                    <button class="credit-tab" data-credit-section="payments">
-                        <i class="fas fa-hand-holding-usd"></i> Pagos
-                    </button>
-                    <button class="credit-tab" data-credit-section="tracking">
-                        <i class="fas fa-chart-line"></i> Seguimiento </button>
-                        <button class="btn-info small-btn" onclick="app.generateCustomerStatementPDF('${customer.id}')" title="Generar Estado de Cuenta">
-    <i class="fas fa-file-invoice"></i> Estado de Cuenta
-</button>
-                </div>
+<div class="credit-tabs">
+    <button class="credit-tab active" data-credit-section="customers">
+        <i class="fas fa-users"></i> Clientes
+    </button>
+    <button class="credit-tab" data-credit-section="credit-sales">
+        <i class="fas fa-file-invoice-dollar"></i> Ventas Fiadas
+    </button>
+    <button class="credit-tab" data-credit-section="payments">
+        <i class="fas fa-hand-holding-usd"></i> Pagos
+    </button>
+    <button class="credit-tab" data-credit-section="tracking">
+        <i class="fas fa-chart-line"></i> Seguimiento 
+    </button>
+</div>
+
 
                 <div id="customers" class="credit-subsection active">
                     <div class="subsection-header">
@@ -335,6 +334,10 @@
                         </div>
                     </div>
                     
+                    
+
+
+
                     <div class="active-debts" id="active-debts"></div>
                 </div>
             </section>
@@ -667,6 +670,26 @@
             </div>
         </div>
 
-    </div> <script src="app.js"></script>
+    </div> 
+    
+    <div id="purchase-history-modal" class="modal">
+  <div class="modal-content large">
+    <span class="close" id="close-purchase-history-modal">&times;</span>
+    <h3><i class="fas fa-history"></i> Historial de Compras</h3>
+<table class="inventory-table">
+  <thead>
+    <tr>
+      <th>Fecha</th>
+      <th>Proveedor</th>
+      <th>Total</th>
+      <th>Acciones</th> </tr>
+  </thead>
+  <tbody id="purchase-history-table-body">
+    </tbody>
+</table>
+  </div>
+</div>
+
+    <script src="app.js"></script>
 </body>
 </html>

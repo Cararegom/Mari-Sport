@@ -95,6 +95,17 @@ class MariSportApp {
                 }
             });
         }
+document.getElementById('view-all-purchases-btn')?.addEventListener('click', () => this.showPurchaseHistory());
+
+// Cerrar el modal
+document.getElementById('close-purchase-history-modal')?.addEventListener('click', () => {
+  document.getElementById('purchase-history-modal').style.display = 'none';
+});
+
+// Cerrar el modal
+document.getElementById('close-purchase-history-modal')?.addEventListener('click', () => {
+  document.getElementById('purchase-history-modal').style.display = 'none';
+});
 
         // Modal de Pagos (Abonos)
         document.getElementById('payment-form').addEventListener('submit', (e) => this.handlePaymentSubmit(e));
@@ -119,7 +130,21 @@ class MariSportApp {
         const receptionStatusFilter = document.getElementById('reception-status-filter');
         if (receptionStatusFilter) receptionStatusFilter.addEventListener('change', () => this.renderPendingReceptionsList());
 
+        const activeDebtsContainer = document.getElementById('active-debts');
+if (activeDebtsContainer) {
+    activeDebtsContainer.addEventListener('click', (e) => {
+        // Busca si el clic fue en una tarjeta de resumen de cliente
+        const summaryCard = e.target.closest('.customer-debt-summary');
         
+        // Si se encontró una tarjeta, obtén su ID y llama a la función para expandir/contraer
+        if (summaryCard) {
+            const customerId = summaryCard.dataset.customerId;
+            if (customerId) {
+                this.toggleCustomerDebtDetails(customerId);
+            }
+        }
+    });
+}
 
         // Modal de Registrar Recepción
         const receivePurchaseForm = document.getElementById('receive-purchase-form');
@@ -139,12 +164,7 @@ class MariSportApp {
         // Estadísticas
         document.getElementById('stats-period').addEventListener('change', () => this.updateStats());
 
-        // NUEVO: Historial de Compras
-        const viewAllPurchasesBtn = document.getElementById('view-all-purchases-btn');
-        if (viewAllPurchasesBtn) viewAllPurchasesBtn.addEventListener('click', () => this.toggleAllPurchasesView());
-
-
-
+        
         // Cierre de modales al hacer clic fuera
         window.addEventListener('click', (e) => {
             if (e.target.classList.contains('modal')) {
@@ -454,64 +474,7 @@ async handlePurchaseSubmit(e) {
         this.showNotification('Error al registrar la compra: ' + error.message, 'error');
     }
 }    
-    // --- NUEVO: Historial de Todas las Compras ---
-    toggleAllPurchasesView() {
-        const container = document.getElementById('all-purchases-container');
-        if (container) {
-            if (container.style.display === 'none' || container.style.display === '') {
-                this.renderAllPurchases();
-                container.style.display = 'block';
-                document.getElementById('view-all-purchases-btn').innerHTML = '<i class="fas fa-eye-slash"></i> Ocultar Historial';
-            } else {
-                container.style.display = 'none';
-                document.getElementById('view-all-purchases-btn').innerHTML = '<i class="fas fa-history"></i> Ver Historial de Compras';
-            }
-        }
-    }
-
-    async renderAllPurchases() {
-        const tbody = document.getElementById('all-purchases-list');
-        if (!tbody) {
-            console.error("Contenedor de lista de todas las compras no encontrado.");
-            return;
-        }
-
-        if (!this.purchases || this.purchases.length === 0) {
-            // Forzar recarga si está vacío por si acaso
-            console.log("No hay compras en this.purchases, intentando recargar...");
-            await this.loadPurchases(); 
-        }
-        
-        // Verificar si después de la recarga sigue vacío o si falta info de productos
-         if (this.purchases.some(p => p.producto_id && !p.productos)) { 
-            console.log("Algunas compras no tienen datos de producto anidados, recargando compras...");
-            await this.loadPurchases(); // Asegura que el join se haya hecho
-        }
-
-
-        if (this.purchases.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;">No hay compras registradas.</td></tr>';
-            return;
-        }
-
-        tbody.innerHTML = this.purchases.map(purchase => {
-            const productName = purchase.productos?.nombre || `ID: ${purchase.producto_id || 'N/A'}`;
-            const totalCost = (purchase.cantidad_comprada * purchase.precio_compra_unitario).toFixed(2);
-            return `
-                <tr>
-                    <td>${productName}</td>
-                    <td>${new Date(purchase.fecha_compra + "T00:00:00").toLocaleDateString()}</td>
-                    <td>${purchase.proveedor || 'N/A'}</td>
-                    <td>${purchase.cantidad_comprada}</td>
-                    <td>$${parseFloat(purchase.precio_compra_unitario).toFixed(2)}</td>
-                    <td>$${totalCost}</td>
-                    <td>${purchase.cantidad_recibida}</td>
-                    <td><span class="status-${purchase.estado_recepcion}">${purchase.estado_recepcion ? purchase.estado_recepcion.replace('_', ' ').toUpperCase() : 'N/A'}</span></td>
-                    <td>${purchase.fecha_ultima_recepcion ? new Date(purchase.fecha_ultima_recepcion + "T00:00:00").toLocaleDateString() : 'N/A'}</td>
-                </tr>
-            `;
-        }).join('');
-    }
+    
 
 
     // --- Gestión de Recepción de Mercancía ---
@@ -700,7 +663,127 @@ async handlePurchaseSubmit(e) {
         }
     }
 
+// app.js - REEMPLAZA el método showPurchaseHistory con esta versión corregida
 
+async showPurchaseHistory() {
+    const modal = document.getElementById('purchase-history-modal');
+    const table = document.querySelector('#purchase-history-modal .inventory-table');
+    
+    if (!modal || !table) {
+        console.error('El modal o la tabla del historial de compras no existen en el HTML.');
+        return;
+    }
+
+    const tbody = table.querySelector('tbody');
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Cargando historial...</td></tr>';
+    modal.style.display = 'block';
+
+    try {
+        const { data: compras, error } = await this.supabase
+            .from('ordenes_compra')
+            .select(`*, detalles_compra (*, productos (nombre))`)
+            .order('fecha_compra', { ascending: false });
+
+        if (error) throw error;
+
+        if (compras.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No hay compras registradas.</td></tr>';
+        } else {
+            tbody.innerHTML = compras.map(compra => {
+                const fechaFormateada = new Date(compra.fecha_compra).toLocaleDateString();
+                
+                const detallesHtml = compra.detalles_compra.map(detalle => `
+                    <li class="purchase-detail-item">
+                        <span class="product-name">${detalle.productos.nombre || 'Producto no encontrado'}</span>
+                        <span class="product-meta">
+                            Cant: ${detalle.cantidad_comprada} &bull; Costo U: ${this.formatCurrency(detalle.precio_compra_unitario)}
+                        </span>
+                    </li>
+                `).join('');
+
+                return `
+                    <tr class="purchase-history-main-row" onclick="app.togglePurchaseDetails('${compra.id}')">
+                        <td>${fechaFormateada}</td>
+                        <td>${compra.proveedor || '-'}</td>
+                        <td>${this.formatCurrency(compra.costo_total)}</td>
+                        <td>
+                            <button class="btn-secondary small-btn" id="btn-toggle-${compra.id}">
+                                <i class="fas fa-plus"></i> Ver Detalles
+                            </button>
+                        </td>
+                    </tr>
+                    <tr class="purchase-history-details-row" id="details-${compra.id}">
+                        <td colspan="4">
+                            <div class="details-card">
+                                <h6>Productos en esta compra:</h6>
+                                <ul class="purchase-details-list">
+                                    ${detallesHtml}
+                                </ul>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color: red;">Error al cargar el historial.</td></tr>`;
+        this.showNotification('Error al cargar el historial de compras: ' + err.message, 'error');
+        console.error("Error en historial de compras:", err);
+    }
+}
+
+// app.js - AÑADE ESTE NUEVO MÉTODO A TU CLASE
+
+// app.js - REEMPLAZA POR COMPLETO tu método toggleCustomerDebtDetails con este
+
+toggleCustomerDebtDetails(customerId) {
+    const targetDetailsContainer = document.getElementById(`details-for-customer-${customerId}`);
+    const targetSummaryCard = document.querySelector(`.customer-debt-summary[data-customer-id="${customerId}"]`);
+    
+    if (!targetDetailsContainer || !targetSummaryCard) {
+        console.error("No se encontraron los elementos para el cliente:", customerId);
+        return;
+    }
+
+    // Comprueba si la tarjeta que clickeamos ya estaba expandida ANTES de cerrar todo.
+    const wasAlreadyExpanded = targetDetailsContainer.style.display === 'block';
+
+    // --- PASO 1: CERRAR TODAS LAS TARJETAS ---
+    // Ocultamos todos los contenedores de detalles.
+    const allDetailContainers = document.querySelectorAll('.customer-debt-details');
+    allDetailContainers.forEach(container => {
+        container.style.display = 'none';
+    });
+
+    // Quitamos el estado 'expanded' de todas las tarjetas de resumen.
+    const allSummaryCards = document.querySelectorAll('.customer-debt-summary');
+    allSummaryCards.forEach(card => {
+        card.classList.remove('expanded');
+    });
+
+    // --- PASO 2: ABRIR LA TARJETA CORRECTA (si no estaba ya abierta) ---
+    // Si la tarjeta que clickeamos no era la que ya estaba abierta, la expandimos.
+    // Si era la que ya estaba abierta, el efecto es simplemente cerrarla (lo que ya hicimos en el paso 1).
+    if (!wasAlreadyExpanded) {
+        targetDetailsContainer.style.display = 'block';
+        targetSummaryCard.classList.add('expanded');
+    }
+}
+
+togglePurchaseDetails(orderId) {
+    const detailsRow = document.getElementById(`details-${orderId}`);
+    const button = document.getElementById(`btn-toggle-${orderId}`);
+    if (!detailsRow || !button) return;
+
+    // Cambia la visibilidad de la fila de detalles
+    const isVisible = detailsRow.style.display === 'table-row';
+    detailsRow.style.display = isVisible ? 'none' : 'table-row';
+
+    // Cambia el texto y el ícono del botón
+    button.innerHTML = isVisible 
+        ? '<i class="fas fa-plus"></i> Ver Detalles' 
+        : '<i class="fas fa-minus"></i> Ocultar';
+}
     // --- Gestión Financiera (Ingresos y Egresos) ---
     async loadFinancialMovements() {
         try {
@@ -782,7 +865,7 @@ async handlePurchaseSubmit(e) {
         try {
             const { data, error } = await this.supabase
                 .from('ventas_fiadas')
-                .select(`*, clientes(nombre, telefono)`)
+                .select(`*, clientes(id, nombre, telefono)`)
                 .order('fecha_inicio', { ascending: false });
             if (error) throw error;
             this.creditSales = data || [];
@@ -1075,12 +1158,20 @@ generarPDFVenta({
     }
 
     // --- Estadísticas ---
-    async updateStats() {
-        const statsPeriodEl = document.getElementById('stats-period');
-        if (!statsPeriodEl) return;
-        let period = statsPeriodEl.value;
-        const now = new Date();
-        let startDate;
+   async updateStats() {
+    const totalSalesEl = document.getElementById('total-sales');
+    const totalExpensesEl = document.getElementById('total-expenses');
+    const generalBalanceEl = document.getElementById('general-balance');
+    const avgSaleEl = document.getElementById('avg-sale');
+    const totalOrdersEl = document.getElementById('total-orders');
+    const statsPeriodEl = document.getElementById('stats-period');
+    const bestSellersList = document.getElementById('best-sellers-list');
+
+    if (!statsPeriodEl) return;
+
+    let period = statsPeriodEl.value;
+    const now = new Date();
+    let startDate;
 
         switch (period) {
             case 'day': startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate()); break;
@@ -1985,20 +2076,118 @@ renderPendingDebts() {
                 </div>
             `;
         }).join('');
-    }    renderActiveDebts() { 
-        const container = document.getElementById('active-debts');
-        if (!container) return;
-        const active = this.creditSales.filter(s => s.estado !== 'pagada');
-        if (active.length === 0) {
-            container.innerHTML = "<p class='empty-message'>No hay deudas activas.</p>"; return;
-        }
-        container.innerHTML = active.map(sale => `
-            <div class="debt-card simple status-${sale.estado}">
-                <span class="debt-customer">${sale.clientes?.nombre || 'Cliente Desc.'}</span>
-                <span class="debt-status-tag">${sale.estado?.toUpperCase()}</span>
-                <p>Pendiente: $${(sale.saldo_pendiente||0).toFixed(2)} (Límite: ${new Date(sale.fecha_limite+"T00:00:00").toLocaleDateString()})</p>
-            </div>`).join('');
+    }    
+
+
+
+// app.js - REEMPLAZA POR COMPLETO tu método renderActiveDebts con esta versión
+
+// app.js - REEMPLAZA POR COMPLETO tu método renderActiveDebts con esta versión final y robusta
+
+renderActiveDebts() {
+    const container = document.getElementById('active-debts');
+    if (!container) return;
+
+    const activeSales = this.creditSales.filter(s => s.estado !== 'pagada');
+    if (activeSales.length === 0) {
+        container.innerHTML = "<p class='empty-message'>¡Felicidades! No hay deudas activas.</p>";
+        return;
     }
+
+    const debtsByCustomer = activeSales.reduce((acc, sale) => {
+        const customerId = sale.cliente_id;
+        if (!acc[customerId]) {
+            // Aseguramos que el objeto 'customer' exista aunque la relación falle
+            acc[customerId] = {
+                customer: sale.clientes || { id: customerId, nombre: 'Cliente no encontrado' },
+                sales: [],
+                totalDebt: 0
+            };
+        }
+        acc[customerId].sales.push(sale);
+        acc[customerId].totalDebt += sale.saldo_pendiente;
+        return acc;
+    }, {});
+
+    // Usamos Object.entries para obtener el ID (la clave del objeto) de forma segura
+    container.innerHTML = Object.entries(debtsByCustomer).map(([customerId, debtInfo]) => {
+        
+        const detailsHtml = debtInfo.sales.map(sale => {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const dueDate = new Date(sale.fecha_limite + 'T00:00:00');
+            const diffTime = dueDate - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            let dueDateStatus, dueDateClass;
+            if (diffDays < 0) {
+                dueDateStatus = `Vencida hace ${Math.abs(diffDays)} días`;
+                dueDateClass = 'status-overdue';
+            } else if (diffDays === 0) {
+                dueDateStatus = 'Vence Hoy';
+                dueDateClass = 'status-due-today';
+            } else {
+                dueDateStatus = `Vence en ${diffDays} días`;
+                dueDateClass = 'status-pending';
+            }
+
+            const salePayments = this.payments.filter(p => p.venta_id === sale.id);
+            const totalPaidForSale = salePayments.reduce((sum, p) => sum + p.monto, 0);
+            
+            const productsHtml = (JSON.parse(sale.productos || '[]')).map(p => 
+                `<li class="product-item"><span class="product-item-name">${p.nombre} (x${p.quantity})</span><span class="product-item-subtotal">${this.formatCurrency(p.precio * p.quantity)}</span></li>`
+            ).join('');
+
+            const paymentsHtml = salePayments.map(p =>
+                `<li class="payment-item"><span class="payment-item-date">Abono el ${new Date(p.fecha_abono + 'T00:00:00').toLocaleDateString()}</span><span class="payment-item-amount">${this.formatCurrency(p.monto)}</span></li>`
+            ).join('');
+
+            return `
+                <div class="sale-card status-${sale.estado}">
+                    <div class="sale-card-header">
+                        <h4>Venta del ${new Date(sale.fecha_inicio + 'T00:00:00').toLocaleDateString()}</h4>
+                        <span class="status-tag ${dueDateClass}">${dueDateStatus}</span>
+                    </div>
+                    <div class="sale-card-body">
+                        <div class="products-section">
+                            <h5>Productos</h5>
+                            <ul>${productsHtml}</ul>
+                        </div>
+                        <div class="payments-section">
+                            <h5>Abonos</h5>
+                            ${paymentsHtml.length > 0 ? `<ul>${paymentsHtml}</ul>` : '<p style="font-style: italic; font-size: 0.9em; padding: 0.5rem;">Sin abonos para esta venta.</p>'}
+                        </div>
+                    </div>
+                    <div class="sale-card-footer">
+                        <div class="footer-totals">
+                           <span>Total: ${this.formatCurrency(sale.total)}</span>
+                           <span class="saldo">Saldo: ${this.formatCurrency(sale.saldo_pendiente)}</span>
+                        </div>
+                        <button class="btn-primary small-btn" onclick="event.stopPropagation(); app.openPaymentModal('${sale.id}')">
+                            <i class="fas fa-hand-holding-usd"></i> Registrar Abono
+                        </button>
+                    </div>
+                </div>`;
+        }).join('');
+
+        return `
+            <div class="customer-debt-container">
+                <div class="customer-debt-summary" data-customer-id="${customerId}">
+                    <span class="customer-name">${debtInfo.customer.nombre}</span>
+                    <div class="debt-info">
+                        <span class="total-debt">Deuda Total: ${this.formatCurrency(debtInfo.totalDebt)}</span>
+                        <i class="fas fa-chevron-down expand-icon"></i>
+                    </div>
+                </div>
+                <div class="customer-debt-details" id="details-for-customer-${customerId}">
+                    ${detailsHtml}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+
     updateTrackingSummary() {
         const totalCredit = this.creditSales.reduce((sum, s) => sum + (s.total || 0), 0);
         const totalPending = this.creditSales.reduce((sum, s) => sum + (s.saldo_pendiente || 0), 0);
@@ -2006,6 +2195,7 @@ renderPendingDebts() {
 document.getElementById('total-collected').textContent = this.formatCurrency(totalCredit - totalPending);
 document.getElementById('total-pending').textContent = this.formatCurrency(totalPending);
     }
+    
     
 } // Fin de la clase MariSportApp
 function generarPDFEstadoCuenta({ cliente, ventasCliente, abonosCliente }) {
