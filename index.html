@@ -50,6 +50,14 @@
                 <i class="fas fa-credit-card"></i>
                 <span>Crédito</span>
             </button>
+            <button class="nav-tab" data-section="credit">
+    <i class="fas fa-credit-card"></i>
+    <span>Crédito</span>
+</button>
+<button class="nav-tab" data-section="cash-register">
+    <i class="fas fa-cash-register"></i>
+    <span>Caja</span>
+</button>
         </nav>
 
         <main class="main-content">
@@ -70,7 +78,7 @@
                         <div class="cart-items" id="cart-items"></div>
                         <div class="cart-total">
                             <div class="total-line">
-                                <span>Total: $<span id="cart-total-display">0.00</span></span>
+                                <span>Total: <span id="cart-total-display">0.00</span></span>
                             </div>
                         </div>
                         
@@ -98,6 +106,18 @@
                     </div>
                 </div>
             </section>
+            <section id="cash-register" class="section">
+    <div class="section-header">
+        <h2><i class="fas fa-cash-register"></i> Historial de Caja (Ventas de Contado)</h2>
+        <p class="motivational">El registro de tu esfuerzo diario.</p>
+    </div>
+    <div class="filter-bar">
+        <label for="sales-history-date">Filtrar por fecha:</label>
+        <input type="date" id="sales-history-date">
+    </div>
+    <div id="sales-history-list" class="sales-history-container">
+        </div>
+</section>
 
             <section id="catalog" class="section">
                 <div class="section-header">
@@ -689,7 +709,27 @@
 </table>
   </div>
 </div>
-
+<div id="edit-sale-modal" class="modal">
+    <div class="modal-content">
+        <span class="close" id="close-edit-sale-modal">&times;</span>
+        <h3>Editar Venta</h3>
+        <form id="edit-sale-form">
+            <p><strong>Venta ID:</strong> <span id="edit-sale-group-id"></span></p>
+            <div class="form-group">
+                <label for="edit-payment-method">Método de Pago</label>
+                <select id="edit-payment-method">
+                    <option value="efectivo">Efectivo</option>
+                    <option value="tarjeta">Tarjeta</option>
+                    <option value="transferencia">Transferencia</option>
+                </select>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-secondary" id="cancel-edit-sale">Cancelar</button>
+                <button type="submit" class="btn-primary">Guardar Cambios</button>
+            </div>
+        </form>
+    </div>
+</div>
     <script src="app.js"></script>
 </body>
 </html>

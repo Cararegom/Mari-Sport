@@ -15,6 +15,7 @@ class MariSportApp {
         this.purchases = []; // Compras de mercancía
         this.financialMovements = []; // Ingresos y Egresos
         this.currentPurchaseItems = [];
+        this.currentCreditSaleItems = [];
         this.currentEditingProduct = null;
         this.currentEditingCustomer = null;
         this.currentCreditSale = null;
@@ -146,6 +147,14 @@ if (activeDebtsContainer) {
     });
 }
 
+    // Listener para la nueva sección de Caja
+document.getElementById('sales-history-date').addEventListener('change', () => this.renderSalesHistory());
+
+// Listeners para el nuevo modal de edición
+document.getElementById('close-edit-sale-modal').onclick = () => document.getElementById('edit-sale-modal').style.display = 'none';
+document.getElementById('cancel-edit-sale').onclick = () => document.getElementById('edit-sale-modal').style.display = 'none';
+document.getElementById('edit-sale-form').onsubmit = (e) => this.handleUpdateSale(e);
+
         // Modal de Registrar Recepción
         const receivePurchaseForm = document.getElementById('receive-purchase-form');
         if(receivePurchaseForm) receivePurchaseForm.addEventListener('submit', (e) => this.handleReceivePurchaseSubmit(e));
@@ -187,7 +196,10 @@ if (activeDebtsContainer) {
         document.querySelector(`.nav-tab[data-section="${sectionId}"]`).classList.add('active');
         document.getElementById(sectionId).classList.add('active');
         if (sectionId === 'stats') this.updateStats();
-        if (sectionId === 'catalog') this.renderCatalog(); 
+        if (sectionId === 'catalog') this.renderCatalog();
+        if (sectionId === 'cash-register')
+            this.renderSalesHistory();
+    
     }
 
     switchCreditSection(sectionId) {
@@ -237,28 +249,33 @@ if (activeDebtsContainer) {
         }
     }
 
-    // --- Gestión de Compras (Mercancía) ---
-    async loadPurchases() {
-        try {
-            const { data, error } = await this.supabase
-                .from('compras')
-                .select(`
-                    *,
-                    productos:producto_id (nombre, imagen_url)
-                `)
-                .order('fecha_compra', { ascending: false });
+// app.js - REEMPLAZA esta función
+async loadPurchases() {
+    try {
+        // Ahora consultamos los detalles de compra y unimos la información de la orden y el producto.
+        const { data, error } = await this.supabase
+            .from('detalles_compra')
+            .select(`
+                *,
+                ordenes_compra ( fecha_compra, proveedor ),
+                productos ( nombre, imagen_url )
+            `)
+            .order('created_at', { ascending: false });
 
-            if (error) {
-                console.error("Error en loadPurchases Supabase:", error);
-                throw error;
-            }
-            this.purchases = data || [];
-        } catch (error) {
-            this.showNotification('Error al cargar compras: ' + error.message, 'error');
-            console.error("Error detallado al cargar compras:", error);
-            this.purchases = [];
+        if (error) {
+            console.error("Error en loadPurchases Supabase:", error);
+            throw error;
         }
+        // El array this.purchases ahora contendrá los detalles de cada producto comprado.
+        this.purchases = data || [];
+    } catch (error) {
+        this.showNotification('Error al cargar detalles de compras: ' + error.message, 'error');
+        console.error("Error detallado al cargar detalles de compras:", error);
+        this.purchases = [];
     }
+}
+
+
 //=================================================
 // FUNCIÓN CENTRAL PARA FORMATEAR MONEDA
 //=================================================
@@ -490,96 +507,90 @@ async handlePurchaseSubmit(e) {
         if (modal) modal.style.display = 'none';
     }
 
-    async renderPendingReceptionsList() {
-        const listContainer = document.getElementById('pending-receptions-list');
-        if (!listContainer) return;
-        
-        if (this.purchases.some(p => p.producto_id && !p.productos)) { 
-            await this.loadPurchases();
-        }
+// app.js - REEMPLAZA esta función
+async renderPendingReceptionsList() {
+    const listContainer = document.getElementById('pending-receptions-list');
+    if (!listContainer) return;
 
-        const filterValue = document.getElementById('reception-status-filter').value;
-        let filteredPurchases;
+    await this.loadPurchases(); // Forzamos la recarga para tener los datos más recientes
 
-        if (filterValue) {
-            filteredPurchases = this.purchases.filter(p => p.estado_recepcion === filterValue);
-        } else { // Mostrar todas por defecto si el filtro está vacío (para 'Todas' en el select)
-            filteredPurchases = this.purchases; 
-        }
+    const filterValue = document.getElementById('reception-status-filter').value;
+    let filteredPurchases = filterValue ? this.purchases.filter(p => p.estado_recepcion === filterValue) : this.purchases;
 
+    if (filteredPurchases.length === 0) {
+        listContainer.innerHTML = "<p>No hay compras que cumplan con el filtro.</p>";
+        return;
+    }
 
-        if (filteredPurchases.length === 0) {
-            listContainer.innerHTML = "<p>No hay compras que cumplan con el filtro.</p>";
-            return;
-        }
-
-        let html = `
-            <table class="inventory-table">
-                <thead>
-                    <tr>
-                        <th>Producto</th>
-                        <th>Fecha Compra</th>
-                        <th>Cant. Comprada</th>
-                        <th>Cant. Recibida</th>
-                        <th>Estado</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-        `;
-        filteredPurchases.forEach(purchase => {
-            const productName = purchase.productos?.nombre || `ID: ${purchase.producto_id || 'N/A'}`;
-            const qtyPending = purchase.cantidad_comprada - purchase.cantidad_recibida;
-            html += `
+    listContainer.innerHTML = `
+        <table class="inventory-table">
+            <thead>
                 <tr>
-                    <td>${productName}</td>
-                    <td>${new Date(purchase.fecha_compra  + "T00:00:00").toLocaleDateString()}</td>
-                    <td>${purchase.cantidad_comprada}</td>
-                    <td>${purchase.cantidad_recibida}</td>
-                    <td><span class="status-${purchase.estado_recepcion}">${purchase.estado_recepcion ? purchase.estado_recepcion.replace('_', ' ').toUpperCase() : 'N/A'}</span></td>
-                    <td>
-                        ${purchase.estado_recepcion !== 'recibida_total' ? 
-                        `<button class="btn-primary small-btn" onclick="app.openReceivePurchaseModal('${purchase.id}')">
-                            <i class="fas fa-dolly"></i> Recibir (${qtyPending > 0 ? qtyPending + ' pend.' : ''})
-                         </button>` : 
-                        'Completada'}
-                    </td>
+                    <th>Producto</th>
+                    <th>Fecha Compra</th>
+                    <th>Cant. Comprada</th>
+                    <th>Cant. Recibida</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
                 </tr>
-            `;
-        });
-        html += `</tbody></table>`;
-        listContainer.innerHTML = html;
+            </thead>
+            <tbody>
+                ${filteredPurchases.map(item => {
+                    const productName = item.productos?.nombre || 'Producto no encontrado';
+                    const fechaCompra = item.ordenes_compra?.fecha_compra ? new Date(item.ordenes_compra.fecha_compra).toLocaleDateString() : 'N/A';
+                    const qtyPending = item.cantidad_comprada - item.cantidad_recibida;
+                    
+                    return `
+                        <tr>
+                            <td>${productName}</td>
+                            <td>${fechaCompra}</td>
+                            <td>${item.cantidad_comprada}</td>
+                            <td>${item.cantidad_recibida}</td>
+                            <td><span class="status-${item.estado_recepcion}">${item.estado_recepcion.replace('_', ' ').toUpperCase()}</span></td>
+                            <td>
+                                ${item.estado_recepcion !== 'recibida_total' ? 
+                                `<button class="btn-primary small-btn" onclick="app.openReceivePurchaseModal('${item.id}')">
+                                    <i class="fas fa-dolly"></i> Recibir (${qtyPending > 0 ? qtyPending : 0} pend.)
+                                 </button>` : 
+                                'Completada'}
+                            </td>
+                        </tr>
+                    `;
+                }).join('')}
+            </tbody>
+        </table>
+    `;
+}
+// app.js - REEMPLAZA esta función
+openReceivePurchaseModal(purchaseDetailId) {
+    this.currentReceivingPurchase = this.purchases.find(p => p.id === purchaseDetailId);
+    if (!this.currentReceivingPurchase) {
+        return this.showNotification("Detalle de compra no encontrado.", "error");
     }
 
-    openReceivePurchaseModal(purchaseId) {
-        this.currentReceivingPurchase = this.purchases.find(p => p.id === purchaseId);
-        if (!this.currentReceivingPurchase) {
-            return this.showNotification("Compra no encontrada.", "error");
-        }
+    const modal = document.getElementById('receive-purchase-modal');
+    if (!modal) return;
 
-        const modal = document.getElementById('receive-purchase-modal');
-        if (!modal) return;
+    const productName = this.currentReceivingPurchase.productos?.nombre || 'Producto no encontrado';
+    document.getElementById('receive-product-info').innerHTML = `
+        <strong>Producto:</strong> ${productName}<br>
+        <strong>Proveedor:</strong> ${this.currentReceivingPurchase.ordenes_compra?.proveedor || 'N/A'}`;
+    
+    document.getElementById('receive-purchase-id').value = purchaseDetailId;
+    document.getElementById('receive-quantity-ordered').value = this.currentReceivingPurchase.cantidad_comprada;
+    document.getElementById('receive-quantity-already-received').value = this.currentReceivingPurchase.cantidad_recibida;
+    
+    const quantityToReceiveInput = document.getElementById('receive-quantity-now');
+    const maxReceivable = this.currentReceivingPurchase.cantidad_comprada - this.currentReceivingPurchase.cantidad_recibida;
+    quantityToReceiveInput.value = maxReceivable > 0 ? maxReceivable : 0;
+    quantityToReceiveInput.max = maxReceivable;
+    quantityToReceiveInput.min = 0;
 
-        const productInfoEl = document.getElementById('receive-product-info');
-        const productName = this.currentReceivingPurchase.productos?.nombre || `ID: ${this.currentReceivingPurchase.producto_id || 'N/A'}`;
-        productInfoEl.innerHTML = `<strong>Producto:</strong> ${productName}<br>
-                                   <strong>Proveedor:</strong> ${this.currentReceivingPurchase.proveedor || 'N/A'}`;
-        
-        document.getElementById('receive-purchase-id').value = purchaseId;
-        document.getElementById('receive-quantity-ordered').value = this.currentReceivingPurchase.cantidad_comprada;
-        document.getElementById('receive-quantity-already-received').value = this.currentReceivingPurchase.cantidad_recibida;
-        
-        const quantityToReceiveInput = document.getElementById('receive-quantity-now');
-        const maxReceivable = this.currentReceivingPurchase.cantidad_comprada - this.currentReceivingPurchase.cantidad_recibida;
-        quantityToReceiveInput.value = maxReceivable > 0 ? maxReceivable : 0; // Evitar negativo si ya se recibió todo por error
-        quantityToReceiveInput.max = maxReceivable;
-        quantityToReceiveInput.min = 0;
-
-        document.getElementById('receive-date').valueAsDate = new Date();
-        document.getElementById('receive-notes').value = this.currentReceivingPurchase.notas_recepcion || '';
-        
-        modal.style.display = 'block';
-    }
+    document.getElementById('receive-date').valueAsDate = new Date();
+    document.getElementById('receive-notes').value = '';
+    
+    modal.style.display = 'block';
+}
 
     closeReceivePurchaseModal() {
         const modal = document.getElementById('receive-purchase-modal');
@@ -587,82 +598,67 @@ async handlePurchaseSubmit(e) {
         this.currentReceivingPurchase = null;
     }
 
-    async handleReceivePurchaseSubmit(e) {
-        e.preventDefault();
-        if (!this.currentReceivingPurchase) return;
+// app.js - REEMPLAZA esta función
+async handleReceivePurchaseSubmit(e) {
+    e.preventDefault();
+    if (!this.currentReceivingPurchase) return;
 
-        const purchaseId = document.getElementById('receive-purchase-id').value;
-        const cantidadARecibirAhora = parseInt(document.getElementById('receive-quantity-now').value);
-        const fechaRecepcion = document.getElementById('receive-date').value;
-        const notasRecepcion = document.getElementById('receive-notes').value;
+    const purchaseDetailId = document.getElementById('receive-purchase-id').value;
+    const cantidadARecibirAhora = parseInt(document.getElementById('receive-quantity-now').value, 10);
+    const fechaRecepcion = document.getElementById('receive-date').value;
 
-        const maxReceivable = this.currentReceivingPurchase.cantidad_comprada - this.currentReceivingPurchase.cantidad_recibida;
-
-        if (isNaN(cantidadARecibirAhora) || cantidadARecibirAhora < 0) {
-            return this.showNotification(`La cantidad a recibir no puede ser negativa.`, 'warning');
-        }
-        if (cantidadARecibirAhora > maxReceivable) {
-             return this.showNotification(`No puedes recibir más de lo pendiente (${maxReceivable}).`, 'warning');
-        }
-        if (!fechaRecepcion) {
-            return this.showNotification("La fecha de recepción es obligatoria.", "warning");
-        }
-
-        try {
-            if (cantidadARecibirAhora > 0) {
-                const productToUpdate = this.products.find(p => p.id === this.currentReceivingPurchase.producto_id);
-                if (!productToUpdate) throw new Error("Producto asociado a la compra no encontrado para actualizar stock.");
-                
-                const newStock = productToUpdate.stock + cantidadARecibirAhora;
-                const { error: stockUpdateError } = await this.supabase
-                    .from('productos')
-                    .update({ stock: newStock })
-                    .eq('id', this.currentReceivingPurchase.producto_id);
-                if (stockUpdateError) throw stockUpdateError;
-                productToUpdate.stock = newStock; 
-            }
-            
-            const nuevaCantidadRecibidaTotal = this.currentReceivingPurchase.cantidad_recibida + cantidadARecibirAhora;
-            let nuevoEstadoRecepcion = this.currentReceivingPurchase.estado_recepcion;
-            if (nuevaCantidadRecibidaTotal >= this.currentReceivingPurchase.cantidad_comprada) {
-                nuevoEstadoRecepcion = 'recibida_total';
-            } else if (nuevaCantidadRecibidaTotal > 0) {
-                nuevoEstadoRecepcion = 'recibida_parcial';
-            } else { // Si sigue siendo 0 y se intentó recibir 0, se queda en pendiente.
-                 nuevoEstadoRecepcion = 'pendiente';
-            }
-
-            const updateData = {
-                cantidad_recibida: nuevaCantidadRecibidaTotal,
-                estado_recepcion: nuevoEstadoRecepcion,
-                notas_recepcion: notasRecepcion
-            };
-            if (cantidadARecibirAhora > 0 || !this.currentReceivingPurchase.fecha_ultima_recepcion) { // Actualizar fecha si se recibe algo o si es la primera vez
-                updateData.fecha_ultima_recepcion = fechaRecepcion;
-            }
-
-
-            const { error: purchaseUpdateError } = await this.supabase
-                .from('compras')
-                .update(updateData)
-                .eq('id', purchaseId);
-            if (purchaseUpdateError) throw purchaseUpdateError;
-
-            this.showNotification('Recepción registrada y stock actualizado.', 'success');
-            
-            await this.loadPurchases(); 
-            this.renderInventory();
-            this.renderPOSProducts();
-            this.renderCatalog();
-            this.renderPendingReceptionsList(); 
-            this.closeReceivePurchaseModal();
-
-        } catch (error) {
-            console.error("Error en handleReceivePurchaseSubmit:", error);
-            this.showNotification('Error al registrar la recepción: ' + error.message, 'error');
-        }
+    if (isNaN(cantidadARecibirAhora) || cantidadARecibirAhora < 0 || !fechaRecepcion) {
+        return this.showNotification('La cantidad y la fecha son obligatorias.', 'warning');
     }
 
+    const maxReceivable = this.currentReceivingPurchase.cantidad_comprada - this.currentReceivingPurchase.cantidad_recibida;
+    if (cantidadARecibirAhora > maxReceivable) {
+        return this.showNotification(`No puedes recibir más de la cantidad pendiente (${maxReceivable}).`, 'warning');
+    }
+
+    try {
+        // 1. Actualizar el stock del producto si se recibe mercancía
+        if (cantidadARecibirAhora > 0) {
+            const productToUpdate = this.products.find(p => p.id === this.currentReceivingPurchase.producto_id);
+            if (!productToUpdate) throw new Error("Producto no encontrado para actualizar stock.");
+            
+            const newStock = productToUpdate.stock + cantidadARecibirAhora;
+            const { error: stockUpdateError } = await this.supabase
+                .from('productos')
+                .update({ stock: newStock })
+                .eq('id', this.currentReceivingPurchase.producto_id);
+            if (stockUpdateError) throw stockUpdateError;
+        }
+        
+        // 2. Actualizar el detalle de la compra
+        const nuevaCantidadRecibidaTotal = this.currentReceivingPurchase.cantidad_recibida + cantidadARecibirAhora;
+        const nuevoEstado = nuevaCantidadRecibidaTotal >= this.currentReceivingPurchase.cantidad_comprada ? 'recibida_total' : 'recibida_parcial';
+        
+        const { error: detailUpdateError } = await this.supabase
+            .from('detalles_compra')
+            .update({ 
+                cantidad_recibida: nuevaCantidadRecibidaTotal,
+                estado_recepcion: nuevoEstado 
+            })
+            .eq('id', purchaseDetailId);
+        if (detailUpdateError) throw detailUpdateError;
+
+        this.showNotification('Recepción registrada y stock actualizado.', 'success');
+        
+        // 3. Recargar y refrescar las vistas
+        await this.loadProducts(); 
+        await this.loadPurchases();
+        this.renderInventory();
+        this.renderPOSProducts();
+        this.renderCatalog();
+        this.renderPendingReceptionsList(); 
+        this.closeReceivePurchaseModal();
+
+    } catch (error) {
+        console.error("Error en handleReceivePurchaseSubmit:", error);
+        this.showNotification('Error al registrar la recepción: ' + error.message, 'error');
+    }
+}
 // app.js - REEMPLAZA el método showPurchaseHistory con esta versión corregida
 
 async showPurchaseHistory() {
@@ -820,46 +816,58 @@ togglePurchaseDetails(orderId) {
         }
     }
 
-    async saveSale(saleData) { 
-        try {
-            const saleItems = JSON.parse(saleData.productos);
-            const newVentasRecords = saleItems.map(item => ({
-                producto_id: item.id,
-                cantidad: item.quantity,
-                total: item.precio * item.quantity,
-                fecha: new Date(saleData.fecha).toISOString(),
-                forma_pago: saleData.forma_pago,
-                pagado: true, 
-            }));
+// app.js - REEMPLAZA esta función
+async saveSale(saleData) {
+    try {
+        const saleItems = JSON.parse(saleData.productos);
+        const grupoVentaId = self.crypto.randomUUID(); // Creamos un ID único para toda esta transacción
 
-            const { data: insertedSales, error: salesError } = await this.supabase
-                .from('ventas')
-                .insert(newVentasRecords)
-                .select();
-            if (salesError) throw salesError;
+        // 1. Primero, registramos el movimiento financiero para obtener su ID
+        const financialMovementData = {
+            tipo: 'ingreso',
+            descripcion: `Venta POS (${saleData.forma_pago})`,
+            monto: saleData.total,
+            fecha: new Date(saleData.fecha).toISOString(),
+            referencia_id: grupoVentaId, // Usamos el grupo_venta_id como referencia inicial
+            tabla_referencia: 'ventas'
+        };
+        const { data: savedMovement, error: movementError } = await this.supabase
+            .from('movimientos_financieros')
+            .insert(financialMovementData)
+            .select('id')
+            .single();
 
-            const financialMovementData = {
-                tipo: 'ingreso',
-                descripcion: `Venta POS (${saleData.forma_pago})`,
-                monto: saleData.total, 
-                fecha: new Date(saleData.fecha).toISOString(),
-            };
-            const { error: movementError } = await this.supabase
-                .from('movimientos_financieros')
-                .insert([financialMovementData]);
-            if (movementError) {
-                console.error("Error registrando ingreso por venta POS:", movementError);
-                this.showNotification('Venta guardada, pero error registrando ingreso financiero.', 'warning');
-            }
+        if (movementError) throw movementError;
+        
+        // 2. Ahora, preparamos los registros de venta, incluyendo el ID del grupo y el ID del movimiento
+        const newVentasRecords = saleItems.map(item => ({
+            producto_id: item.id,
+            cantidad: item.quantity,
+            total: item.precio_venta * item.quantity, // Usamos precio_venta
+            fecha: new Date(saleData.fecha).toISOString(),
+            forma_pago: saleData.forma_pago,
+            pagado: true,
+            grupo_venta_id: grupoVentaId, // Asignamos el ID del grupo a cada item
+        }));
 
-            await this.loadSales();
-            await this.loadFinancialMovements();
-            this.updateStats();
-        } catch (error) {
-            console.error("Error en saveSale:", error);
-            this.showNotification('Error al guardar venta POS: ' + error.message, 'error');
-        }
+        // 3. Insertamos todos los items de la venta
+        const { error: salesError } = await this.supabase
+            .from('ventas')
+            .insert(newVentasRecords);
+        if (salesError) throw salesError;
+
+        // Recargamos datos y actualizamos vistas
+        await this.loadSales();
+        await this.loadFinancialMovements();
+        this.updateStats();
+
+    } catch (error) {
+        console.error("Error en saveSale:", error);
+        this.showNotification('Error al guardar venta POS: ' + error.message, 'error');
     }
+}
+
+
     
     async loadCreditSales() {
         try {
@@ -1022,56 +1030,62 @@ generarPDFVenta({
 
     
     // --- POS ---
-    async completeSale() {
-        if (this.cart.length === 0) return this.showNotification('El carrito está vacío', 'warning');
-        
-        const paymentMethodEl = document.querySelector('input[name="payment"]:checked');
-        if (!paymentMethodEl) return this.showNotification('Selecciona un método de pago.', 'warning');
-        const paymentMethod = paymentMethodEl.value;
-        const total = this.cart.reduce((sum, item) => sum + (item.precio * item.quantity), 0);
+async completeSale() {
+    if (this.cart.length === 0) return this.showNotification('El carrito está vacío', 'warning');
+    
+    const paymentMethodEl = document.querySelector('input[name="payment"]:checked');
+    if (!paymentMethodEl) return this.showNotification('Selecciona un método de pago.', 'warning');
+    const paymentMethod = paymentMethodEl.value;
+    const total = this.cart.reduce((sum, item) => sum + (item.precio_venta * item.quantity), 0);
 
-        for (const item of this.cart) {
-            const productInDb = this.products.find(p => p.id === item.id);
-            if (!productInDb || productInDb.stock < item.quantity) {
-                 return this.showNotification(`Stock insuficiente para ${item.nombre}. Disponible: ${productInDb?.stock || 0}`, 'error');
-            }
+    for (const item of this.cart) {
+        const productInDb = this.products.find(p => p.id === item.id);
+        if (!productInDb || productInDb.stock < item.quantity) {
+             return this.showNotification(`Stock insuficiente para ${item.nombre}. Disponible: ${productInDb?.stock || 0}`, 'error');
         }
-        
-        const saleData = {
-            productos: JSON.stringify(this.cart.map(item => ({
-                id: item.id, nombre: item.nombre, precio: item.precio,
-                quantity: item.quantity, talla: item.talla, color: item.color
-            }))),
-            total: total,
-            forma_pago: paymentMethod,
-            fecha: new Date().toISOString()
-        };
-
-        for (const item of this.cart) {
-            const productInDb = this.products.find(p => p.id === item.id);
-            const newStock = productInDb.stock - item.quantity;
-            await this.updateProductStock(item.id, newStock, false); 
-        }
-        generarPDFVenta({
-    productos: this.cart,
-    cliente: null, // Si quieres pedir el cliente, pásalo aquí
-    total: this.cart.reduce((sum, item) => sum + item.precio * item.quantity, 0),
-    fecha: new Date().toLocaleString(),
-    tipo: 'contado'
-});
-        await this.saveSale(saleData); 
-        
-        await this.loadProducts(); 
-
-        this.cart = [];
-        this.renderCart();
-        this.updateCartTotal();
-        this.renderPOSProducts();
-        this.renderCatalog();
-        this.renderInventory();
-        this.showNotification('Venta completada exitosamente.', 'success');
     }
     
+    const saleData = {
+        productos: JSON.stringify(this.cart.map(item => ({
+            id: item.id,
+            nombre: item.nombre,
+            precio: item.precio_venta,
+            quantity: item.quantity,
+            talla: item.talla,
+            color: item.color
+        }))),
+        total: total,
+        forma_pago: paymentMethod,
+        fecha: new Date().toISOString()
+    };
+
+    for (const item of this.cart) {
+        const productInDb = this.products.find(p => p.id === item.id);
+        const newStock = productInDb.stock - item.quantity;
+        await this.updateProductStock(item.id, newStock, false); 
+    }
+
+    generarPDFVenta({
+        productos: this.cart.map(item => ({ ...item, precio: item.precio_venta })),
+        cliente: null,
+        total: total,
+        fecha: new Date().toLocaleString(),
+        tipo: 'contado'
+    });
+
+    await this.saveSale(saleData); 
+    await this.loadProducts(); 
+
+    this.cart = [];
+    this.renderCart();
+    this.updateCartTotal();
+    this.renderPOSProducts();
+    this.renderCatalog();
+    this.renderInventory();
+    this.showNotification('Venta completada exitosamente.', 'success');
+}
+
+
     // --- PDF Catálogo ---
     async downloadCatalogPDF() {
         if (typeof jspdf === 'undefined' || typeof jspdf.jsPDF === 'undefined') {
@@ -1262,6 +1276,164 @@ document.getElementById('avg-sale').textContent = this.formatCurrency(avgSaleVal
         }
     }
     
+    // app.js - AÑADE ESTOS NUEVOS MÉTODOS A TU CLASE
+
+renderSalesHistory() {
+    const container = document.getElementById('sales-history-list');
+    const filterDate = document.getElementById('sales-history-date').value;
+    if (!container) return;
+
+    // 1. Filtramos las ventas si se ha seleccionado una fecha
+    let salesToRender = this.sales;
+    if (filterDate) {
+        salesToRender = this.sales.filter(s => s.fecha.startsWith(filterDate));
+    }
+
+    // 2. Agrupamos los items de venta por su 'grupo_venta_id'
+    const groupedSales = salesToRender.reduce((acc, sale) => {
+        const groupId = sale.grupo_venta_id;
+        if (!groupId) return acc;
+        if (!acc[groupId]) {
+            acc[groupId] = {
+                items: [],
+                total: 0,
+                fecha: sale.fecha,
+                forma_pago: sale.forma_pago,
+                id: groupId
+            };
+        }
+        acc[groupId].items.push(sale);
+        acc[groupId].total += sale.total;
+        return acc;
+    }, {});
+
+    // Ordenamos las ventas por fecha, de más reciente a más antigua
+    const sortedSales = Object.values(groupedSales).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+    if (sortedSales.length === 0) {
+        container.innerHTML = `<p class="empty-message">No hay ventas registradas ${filterDate ? 'para esta fecha' : ''}.</p>`;
+        return;
+    }
+
+    // 3. Renderizamos cada grupo de venta como una tarjeta
+    container.innerHTML = sortedSales.map(group => {
+        const productosHtml = JSON.parse(group.items[0]?.productos_string_agg || '[]').map(p => `<li>${p.nombre} (x${p.quantity}) - ${this.formatCurrency(p.precio_venta)}</li>`).join('');
+
+        return `
+            <div class="sale-history-card">
+                <div class="sale-history-header">
+                    <div>
+                        <strong>Fecha:</strong> ${new Date(group.fecha).toLocaleString()} <br>
+                        <strong>Pago con:</strong> ${group.forma_pago}
+                    </div>
+                    <div class="sale-history-total">
+                        Total: ${this.formatCurrency(group.total)}
+                    </div>
+                </div>
+                <div class="sale-history-body">
+                    <strong>Productos:</strong>
+                    <ul>${group.items.map(item => `<li>${this.products.find(p => p.id === item.producto_id)?.nombre || 'Producto borrado'} (x${item.cantidad}) - ${this.formatCurrency(item.total)}</li>`).join('')}</ul>
+                </div>
+                <div class="sale-history-actions">
+                    <button class="btn-secondary small-btn" onclick="app.openEditSaleModal('${group.id}')"><i class="fas fa-edit"></i> Editar</button>
+                    <button class="btn-danger small-btn" onclick="app.deleteSaleGroup('${group.id}')"><i class="fas fa-trash"></i> Eliminar</button>
+                </div>
+            </div>`;
+    }).join('');
+}
+
+async deleteSaleGroup(groupId) {
+    const confirmed = await this.showConfirmation("¿Seguro que quieres eliminar esta venta? Esta acción es irreversible y afectará el stock y los registros financieros.");
+    if (!confirmed) return;
+
+    try {
+        // 1. Encontrar todos los items de la venta
+        const salesToDelete = this.sales.filter(s => s.grupo_venta_id === groupId);
+        if (salesToDelete.length === 0) throw new Error("Venta no encontrada.");
+
+        // 2. Revertir el stock de cada producto
+        for (const item of salesToDelete) {
+            const product = this.products.find(p => p.id === item.producto_id);
+            if (product) {
+                const newStock = product.stock + item.cantidad;
+                await this.updateProductStock(item.producto_id, newStock, false);
+            }
+        }
+        
+        // 3. Eliminar el movimiento financiero asociado
+        const { error: movementError } = await this.supabase
+            .from('movimientos_financieros')
+            .delete()
+            .eq('referencia_id', groupId);
+        if (movementError) console.warn("Advertencia: No se encontró o no se pudo eliminar el movimiento financiero asociado.");
+
+        // 4. Eliminar los registros de la venta
+        const { error: saleError } = await this.supabase
+            .from('ventas')
+            .delete()
+            .eq('grupo_venta_id', groupId);
+        if (saleError) throw saleError;
+        
+        this.showNotification("Venta eliminada y stock restaurado.", "success");
+
+        // 5. Recargar todos los datos y vistas
+        await this.init();
+
+    } catch (error) {
+        console.error("Error al eliminar el grupo de venta:", error);
+        this.showNotification("Error: " + error.message, "error");
+    }
+}
+
+openEditSaleModal(groupId) {
+    const saleGroup = this.sales.filter(s => s.grupo_venta_id === groupId);
+    if (saleGroup.length === 0) return;
+    
+    const modal = document.getElementById('edit-sale-modal');
+    document.getElementById('edit-sale-group-id').textContent = groupId.substring(0, 8);
+    document.getElementById('edit-payment-method').value = saleGroup[0].forma_pago;
+    
+    // Guardamos el ID en el formulario para usarlo al guardar
+    modal.dataset.currentGroupId = groupId;
+    
+    modal.style.display = 'block';
+}
+
+async handleUpdateSale(e) {
+    e.preventDefault();
+    const modal = document.getElementById('edit-sale-modal');
+    const groupId = modal.dataset.currentGroupId;
+    const newPaymentMethod = document.getElementById('edit-payment-method').value;
+
+    try {
+        // Actualizar el método de pago en la tabla 'ventas'
+        const { error: saleError } = await this.supabase
+            .from('ventas')
+            .update({ forma_pago: newPaymentMethod })
+            .eq('grupo_venta_id', groupId);
+        if (saleError) throw saleError;
+
+        // Actualizar la descripción en 'movimientos_financieros'
+        const { error: movementError } = await this.supabase
+            .from('movimientos_financieros')
+            .update({ descripcion: `Venta POS (${newPaymentMethod})` })
+            .eq('referencia_id', groupId);
+        if (movementError) console.warn("Advertencia: No se pudo actualizar el movimiento financiero.");
+        
+        this.showNotification("Venta actualizada.", "success");
+        modal.style.display = 'none';
+
+        await this.loadSales();
+        await this.loadFinancialMovements();
+        this.renderSalesHistory();
+        this.updateStats();
+
+    } catch (error) {
+        console.error("Error al actualizar la venta:", error);
+        this.showNotification("Error: " + error.message, "error");
+    }
+}
+
     openCategoryModal() {
         document.getElementById('category-modal').style.display = 'block';
         document.getElementById('category-form').reset();
@@ -1554,25 +1726,76 @@ async handleProductSubmit(e) {
     }
     filterCatalog() { this.renderCatalog(); }
 
-    addToCart(product) {
-        const selectedSize = product.selectedSize || 'M'; 
-        const selectedColor = product.selectedColor || 'N/A';
+    // app.js - AÑADE ESTOS 4 NUEVOS MÉTODOS A TU CLASE
 
-        const existingItem = this.cart.find(item => 
-            item.id === product.id && item.talla === selectedSize && item.color === selectedColor
-        );
-
-        if (existingItem) {
-            if (existingItem.quantity < product.stock) existingItem.quantity++;
-            else return this.showNotification('No hay suficiente stock disponible.', 'warning');
-        } else {
-            if (product.stock > 0) {
-                this.cart.push({ ...product, quantity: 1, talla: selectedSize, color: selectedColor });
-            } else return this.showNotification('Producto sin stock.', 'warning');
-        }
-        this.renderCart();
+updateCartItemPrice(index, newPrice) {
+    if (this.cart[index]) {
+        this.cart[index].precio_venta = parseFloat(newPrice) || 0;
         this.updateCartTotal();
     }
+}
+
+addProductToCreditSale(productId) {
+    const product = this.products.find(p => p.id === productId);
+    if (!product || product.stock <= 0) return;
+
+    const existingItem = this.currentCreditSaleItems.find(item => item.id === productId);
+    if (!existingItem) {
+        this.currentCreditSaleItems.push({ ...product, quantity: 1, precio_venta: product.precio });
+    }
+    this.updateSelectedCreditProducts();
+}
+
+removeCreditItem(productId) {
+    this.currentCreditSaleItems = this.currentCreditSaleItems.filter(item => item.id !== productId);
+    this.updateSelectedCreditProducts();
+}
+
+updateCreditItem(productId, field, value) {
+    const item = this.currentCreditSaleItems.find(item => item.id === productId);
+    if (!item) return;
+
+    if (field === 'quantity') {
+        item.quantity = parseInt(value) || 1;
+    } else if (field === 'price') {
+        item.precio_venta = parseFloat(value) || 0;
+    }
+    this.updateSelectedCreditProducts();
+}
+
+
+
+addToCart(product) {
+    const selectedSize = product.selectedSize || 'M'; 
+    const selectedColor = product.selectedColor || 'N/A';
+
+    const existingItem = this.cart.find(item => 
+        item.id === product.id && item.talla === selectedSize && item.color === selectedColor
+    );
+
+    if (existingItem) {
+        if (existingItem.quantity < product.stock) {
+            existingItem.quantity++;
+        } else {
+            return this.showNotification('No hay suficiente stock disponible.', 'warning');
+        }
+    } else {
+        if (product.stock > 0) {
+            this.cart.push({ 
+                ...product, 
+                quantity: 1, 
+                precio_venta: product.precio,
+                talla: selectedSize, 
+                color: selectedColor 
+            });
+        } else {
+            return this.showNotification('Producto sin stock.', 'warning');
+        }
+    }
+    
+    this.renderCart();
+    this.updateCartTotal();
+}
 
     removeFromCart(index) {
         this.cart.splice(index, 1);
@@ -1591,32 +1814,41 @@ async handleProductSubmit(e) {
         } else this.showNotification('No hay suficiente stock.', 'warning');
     }
 
-    renderCart() {
-        const container = document.getElementById('cart-items');
-        if(!container) return;
-        if (this.cart.length === 0) {
-            container.innerHTML = '<p class="empty-cart-message">El carrito está vacío</p>';
-            return;
-        }
-        container.innerHTML = this.cart.map((item, index) => `
-            <div class="cart-item">
-                <div class="cart-item-info">
-                    <span class="cart-item-name">${item.nombre}</span>
-<span class="cart-item-details">${this.formatCurrency(item.precio)} ...</span>                </div>
-                <div class="cart-item-controls">
-                    <button class="qty-btn" onclick="app.updateQuantity(${index}, -1)">-</button>
-                    <span class="cart-item-quantity">${item.quantity}</span>
-                    <button class="qty-btn" onclick="app.updateQuantity(${index}, 1)">+</button>
-                    <button class="remove-btn" onclick="app.removeFromCart(${index})"><i class="fas fa-times"></i></button>
-                </div>
-            </div>`).join('');
+renderCart() {
+    const container = document.getElementById('cart-items');
+    if (!container) return;
+
+    if (this.cart.length === 0) {
+        container.innerHTML = '<p class="empty-cart-message">El carrito está vacío</p>';
+        return;
     }
 
+    container.innerHTML = this.cart.map((item, index) => `
+        <div class="cart-item">
+            <div class="cart-item-info">
+                <span class="cart-item-name">${item.nombre}</span>
+                <div class="cart-item-price-editor">
+                    <label>$</label>
+                    <input type="number" class="price-input" value="${item.precio_venta}" 
+                           oninput="app.updateCartItemPrice(${index}, this.value)" 
+                           step="1000" min="0">
+                </div>
+            </div>
+            <div class="cart-item-controls">
+                <button class="qty-btn" onclick="app.updateQuantity(${index}, -1)">-</button>
+                <span class="cart-item-quantity">${item.quantity}</span>
+                <button class="qty-btn" onclick="app.updateQuantity(${index}, 1)">+</button>
+                <button class="remove-btn" onclick="app.removeFromCart(${index})"><i class="fas fa-times"></i></button>
+            </div>
+        </div>`).join('');
+}
+
+
     updateCartTotal() {
-        const total = this.cart.reduce((sum, item) => sum + ((item.precio || 0) * item.quantity), 0);
-document.getElementById('cart-total-display').textContent = this.formatCurrency(total);
-        document.getElementById('complete-sale').disabled = this.cart.length === 0;
-    }
+    const total = this.cart.reduce((sum, item) => sum + ((item.precio_venta || 0) * item.quantity), 0);
+    document.getElementById('cart-total-display').textContent = this.formatCurrency(total);
+    document.getElementById('complete-sale').disabled = this.cart.length === 0;
+}
 
     renderBestSellers(bestSellers) {
         const container = document.getElementById('best-sellers-list');
@@ -1857,17 +2089,21 @@ document.getElementById('cart-total-display').textContent = this.formatCurrency(
         this.renderCustomers(filtered);
     }
 
-    openCreditSaleModal() {
-        const modal = document.getElementById('credit-sale-modal');
-        const form = document.getElementById('credit-sale-form');
-        form.reset();
-        document.getElementById('selected-credit-products').innerHTML = '<p class="empty-message">No hay productos seleccionados.</p>';
-        document.getElementById('credit-total').value = '0.00';
-        this.populateCreditCustomers();
-        this.populateCreditProducts();
-        document.getElementById('first-payment-date').valueAsDate = new Date(new Date().setDate(new Date().getDate() + 1));
-        modal.style.display = 'block';
-    }
+openCreditSaleModal() {
+    const modal = document.getElementById('credit-sale-modal');
+    const form = document.getElementById('credit-sale-form');
+    form.reset();
+    
+    this.currentCreditSaleItems = [];
+    this.updateSelectedCreditProducts(); // Llama para limpiar la vista
+    
+    this.populateCreditCustomers();
+    this.populateCreditProducts();
+    document.getElementById('first-payment-date').valueAsDate = new Date(new Date().setDate(new Date().getDate() + 1));
+    modal.style.display = 'block';
+}
+
+
     closeCreditSaleModal() { document.getElementById('credit-sale-modal').style.display = 'none'; }
 
     populateCreditCustomers() {
@@ -1876,92 +2112,91 @@ document.getElementById('cart-total-display').textContent = this.formatCurrency(
         this.customers.forEach(c => select.innerHTML += `<option value="${c.id}">${c.nombre}</option>`);
     }
 
-    populateCreditProducts() {
-        const container = document.getElementById('credit-products-selector');
-        container.innerHTML = ''; 
-        this.products.filter(p => p.stock > 0).forEach(product => {
-            container.innerHTML += `
-                <div class="credit-product-card" data-product-id="${product.id}">
-                    <img src="${product.imagen_url || 'https://via.placeholder.com/80'}" alt="${product.nombre}" onerror="this.src='https://via.placeholder.com/80';this.onerror=null;">
-                    <div class="name">${product.nombre}</div>
-                    <div class="price">$${product.precio ? product.precio.toFixed(2) : '0.00'}</div>
-                    <div class="stock">Stock: ${product.stock}</div>
-                    <input type="number" class="credit-product-quantity" value="1" min="1" max="${product.stock}">
-                </div>`;
-        });
-    }
-    updateSelectedCreditProducts() {
-        const selectedCards = document.querySelectorAll('#credit-products-selector .credit-product-card.selected');
-        const displayContainer = document.getElementById('selected-credit-products');
-        const totalInput = document.getElementById('credit-total');
-        let currentTotal = 0;
-        let productsHtml = '';
+populateCreditProducts() {
+    const container = document.getElementById('credit-products-selector');
+    container.innerHTML = ''; 
+    this.products.filter(p => p.stock > 0).forEach(product => {
+        container.innerHTML += `
+            <div class="credit-product-card" onclick="app.addProductToCreditSale('${product.id}')">
+                <img src="${product.imagen_url || 'https://via.placeholder.com/80'}" alt="${product.nombre}" onerror="this.src='https://via.placeholder.com/80';this.onerror=null;">
+                <div class="name">${product.nombre}</div>
+                <div class="price">${this.formatCurrency(product.precio)}</div>
+                <div class="stock">Stock: ${product.stock}</div>
+            </div>`;
+    });
+}
 
-        selectedCards.forEach(card => {
-            const product = this.products.find(p => p.id === card.dataset.productId);
-            if (!product) return;
-            const quantityInput = card.querySelector('.credit-product-quantity');
-            let quantity = parseInt(quantityInput.value);
 
-            if (isNaN(quantity) || quantity < 1) quantity = 1;
-            if (quantity > product.stock) {
-                quantity = product.stock;
-                this.showNotification(`Stock máximo para ${product.nombre} es ${product.stock}.`, 'warning', 2000);
-            }
-            quantityInput.value = quantity; 
+updateSelectedCreditProducts() {
+    const displayContainer = document.getElementById('selected-credit-products');
+    const totalInput = document.getElementById('credit-total');
+    let currentTotal = 0;
 
-            currentTotal += (product.precio || 0) * quantity;
-            productsHtml += `
-                <div class="selected-product-item">
-                    <span>${product.nombre} (x${quantity})</span>
-                    <span>$${((product.precio || 0) * quantity).toFixed(2)}</span>
-                </div>`;
-        });
-        displayContainer.innerHTML = productsHtml || '<p class="empty-message">No hay productos seleccionados.</p>';
-        totalInput.value = currentTotal.toFixed(2);
+    if (this.currentCreditSaleItems.length === 0) {
+        displayContainer.innerHTML = '<p class="empty-message">No hay productos seleccionados.</p>';
+        totalInput.value = '0.00';
+        return;
     }
 
-    async handleCreditSaleSubmit(e) {
-        e.preventDefault();
-        const customerId = document.getElementById('credit-customer').value;
-        const total = parseFloat(document.getElementById('credit-total').value);
-        const initialPayment = parseFloat(document.getElementById('initial-payment').value) || 0;
-        const firstPaymentDate = document.getElementById('first-payment-date').value;
-        const termType = document.getElementById('payment-term-type').value;
-        const termValue = parseInt(document.getElementById('payment-term-value').value);
-        const selectedCards = document.querySelectorAll('#credit-products-selector .credit-product-card.selected');
+    displayContainer.innerHTML = this.currentCreditSaleItems.map(item => {
+        const subtotal = (item.precio_venta || 0) * item.quantity;
+        currentTotal += subtotal;
+        return `
+            <div class="selected-product-item">
+                <span class="product-name">${item.nombre}</span>
+                <div class="product-controls">
+                    Cant: <input type="number" class="quantity-input" value="${item.quantity}" min="1" max="${item.stock}" oninput="app.updateCreditItem('${item.id}', 'quantity', this.value)">
+                    Precio: <input type="number" class="price-input" value="${item.precio_venta}" step="1000" min="0" oninput="app.updateCreditItem('${item.id}', 'price', this.value)">
+                    <button class="remove-btn small-btn" onclick="app.removeCreditItem('${item.id}')"><i class="fas fa-times"></i></button>
+                </div>
+            </div>`;
+    }).join('');
 
-        if (!customerId || selectedCards.length === 0 || total <= 0 || !firstPaymentDate || !termValue || termValue < 1)
-            return this.showNotification('Verifica todos los campos: cliente, productos, total, fecha y plazo.', 'warning');
-        if (initialPayment > total) return this.showNotification('Abono inicial no puede ser mayor al total.', 'warning');
+    totalInput.value = currentTotal.toFixed(2);
+}
 
-        const dueDate = new Date(firstPaymentDate + "T00:00:00");
-        if (termType === 'days') dueDate.setDate(dueDate.getDate() + termValue);
-        else dueDate.setMonth(dueDate.getMonth() + termValue);
 
-        const productsInSale = [];
-        for (const card of selectedCards) {
-            const product = this.products.find(p => p.id === card.dataset.productId);
-            const quantity = parseInt(card.querySelector('.credit-product-quantity').value);
-            if (product && quantity > 0) {
-                if (quantity > product.stock) return this.showNotification(`Stock insuficiente para ${product.nombre}.`, 'error');
-                productsInSale.push({ id: product.id, nombre: product.nombre, precio: product.precio, quantity });
-            }
+async handleCreditSaleSubmit(e) {
+    e.preventDefault();
+    const customerId = document.getElementById('credit-customer').value;
+    const total = parseFloat(document.getElementById('credit-total').value);
+    const initialPayment = parseFloat(document.getElementById('initial-payment').value) || 0;
+    const firstPaymentDate = document.getElementById('first-payment-date').value;
+    
+    if (!customerId || this.currentCreditSaleItems.length === 0 || total < 0 || !firstPaymentDate)
+        return this.showNotification('Verifica todos los campos: cliente, productos, total y fecha límite.', 'warning');
+    if (initialPayment > total) return this.showNotification('Abono inicial no puede ser mayor al total.', 'warning');
+
+    const productsInSale = this.currentCreditSaleItems.map(item => ({
+        id: item.id,
+        nombre: item.nombre,
+        precio: item.precio_venta,
+        quantity: item.quantity
+    }));
+
+    for (const item of this.currentCreditSaleItems) {
+        if (item.quantity > item.stock) {
+            return this.showNotification(`Stock insuficiente para ${item.nombre}.`, 'error');
         }
-        if (productsInSale.length === 0) return this.showNotification('No se procesaron productos.', 'error');
-
-        const saleData = {
-            cliente_id: customerId,
-            productos: JSON.stringify(productsInSale),
-            total, abono_inicial: initialPayment,
-            saldo_pendiente: total - initialPayment,
-            fecha_inicio: new Date().toISOString().split('T')[0],
-            fecha_limite: dueDate.toISOString().split('T')[0],
-            estado: (total - initialPayment) <= 0 ? 'pagada' : 'pendiente'
-        };
-        await this.saveCreditSale(saleData); 
-        this.closeCreditSaleModal();
     }
+    
+    const saleData = {
+        cliente_id: customerId,
+        productos: JSON.stringify(productsInSale),
+        total, 
+        abono_inicial: initialPayment,
+        saldo_pendiente: total - initialPayment,
+        fecha_inicio: new Date().toISOString().split('T')[0],
+        fecha_limite: new Date(firstPaymentDate + 'T00:00:00').toISOString().split('T')[0],
+        estado: (total - initialPayment) <= 0 ? 'pagada' : 'pendiente'
+    };
+
+    await this.saveCreditSale(saleData); 
+    this.closeCreditSaleModal();
+}
+
+
+
     renderCreditSales() {
         const container = document.getElementById('credit-sales-list');
         if (!container) return;
@@ -1989,6 +2224,18 @@ document.getElementById('cart-total-display').textContent = this.formatCurrency(
         }).join('');
     }
 
+
+
+    // app.js - AÑADE ESTE NUEVO MÉTODO A TU CLASE
+
+updateCartItemPrice(index, newPrice) {
+    if (this.cart[index]) {
+        // Asignamos el nuevo precio de venta, asegurando que sea un número válido.
+        this.cart[index].precio_venta = parseFloat(newPrice) || 0;
+        // No es necesario volver a renderizar todo el carrito, solo actualizamos el total.
+        this.updateCartTotal();
+    }
+}
     openPaymentModal(saleId) {
         this.currentCreditSale = saleId;
         const modal = document.getElementById('payment-modal');
